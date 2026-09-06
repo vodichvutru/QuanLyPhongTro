@@ -1,0 +1,89 @@
+@host = http://localhost:5255/api
+
+### Đăng nhập chủ trọ
+# @name loginOwner
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "chutro",
+  "password": "123456"
+}
+
+### Lấy thông tin tài khoản (dán token Owner bên dưới)
+GET {{host}}/auth/me
+Authorization: Bearer <ACCESS_TOKEN>
+
+### Danh sách phòng
+GET {{host}}/rooms
+Authorization: Bearer <ACCESS_TOKEN>
+
+### Tạo phòng mới
+POST {{host}}/rooms
+Authorization: Bearer <ACCESS_TOKEN>
+Content-Type: application/json
+
+{
+  "name": "P301",
+  "floor": "3",
+  "area": 18,
+  "price": 2200000,
+  "maxPeople": 2
+}
+
+### Danh sách người thuê
+GET {{host}}/tenants
+Authorization: Bearer <ACCESS_TOKEN>
+
+### Tạo hợp đồng thuê
+POST {{host}}/contracts
+Authorization: Bearer <ACCESS_TOKEN>
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "tenantId": 1,
+  "startDate": "2026-09-01",
+  "endDate": "2027-09-01",
+  "monthlyRent": 2500000,
+  "deposit": 5000000,
+  "electricPrice": 3500,
+  "waterPrice": 25000
+}
+
+### Ghi chỉ số điện/nước
+POST {{host}}/meter-readings
+Authorization: Bearer <ACCESS_TOKEN>
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "readingDate": "2026-09-30",
+  "electricIndex": 120,
+  "waterIndex": 8
+}
+
+### Tự động lập hóa đơn kỳ 2026-09
+POST {{host}}/invoices
+Authorization: Bearer <ACCESS_TOKEN>
+Content-Type: application/json
+
+{
+  "roomId": 1,
+  "billingMonth": "2026-09"
+}
+
+### Thu tiền thanh toán
+POST {{host}}/payments
+Authorization: Bearer <ACCESS_TOKEN>
+Content-Type: application/json
+
+{
+  "invoiceId": 1,
+  "amount": 2500000,
+  "method": "Cash"
+}
+
+### Đăng nhập người thuê rồi xem hóa đơn của mình
+GET {{host}}/me/invoices
+Authorization: Bearer <TENANT_TOKEN>

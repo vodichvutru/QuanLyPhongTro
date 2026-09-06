@@ -1,0 +1,23 @@
+# Build results
+bin/
+obj/
+*.user
+
+# Rider / VS
+.idea/
+.vs/
+
+# Test results
+TestResults/
+*.trx
+
+# Logs
+*.log
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Secrets: local MySQL password & JWT signing key. Keep local only.
+# Clone a fresh copy: cp src/QuanLyPhongTro.Api/appsettings.json.example -> appsettings.json
+src/QuanLyPhongTro.Api/appsettings.json

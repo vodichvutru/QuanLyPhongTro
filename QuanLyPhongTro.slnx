@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/QuanLyPhongTro.Api/QuanLyPhongTro.Api.csproj" />
+    <Project Path="src/QuanLyPhongTro.Application/QuanLyPhongTro.Application.csproj" />
+    <Project Path="src/QuanLyPhongTro.Core/QuanLyPhongTro.Core.csproj" />
+    <Project Path="src/QuanLyPhongTro.Infrastructure/QuanLyPhongTro.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/QuanLyPhongTro.Tests/QuanLyPhongTro.Tests.csproj" />
+  </Folder>
+</Solution>
