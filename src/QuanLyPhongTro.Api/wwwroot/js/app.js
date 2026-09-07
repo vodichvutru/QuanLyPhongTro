@@ -8,7 +8,7 @@ const R = {
   roles: ['Admin', 'Owner', 'Tenant']
 };
 const PAGES = {
-  home:    { label: isTenant() ? 'Trang chủ' : 'Dashboard', roles: ['Admin', 'Owner', 'Tenant'], view: vHome },
+  home:    { label: isTenant() ? 'Trang chủ' : 'Tổng quan', roles: ['Admin', 'Owner', 'Tenant'], view: vHome },
   rooms:   { label: 'Phòng trọ', roles: ['Admin', 'Owner'], view: vRooms },
   tenants: { label: 'Người thuê', roles: ['Admin', 'Owner'], view: vTenants },
   contracts:{ label: 'Hợp đồng', roles: ['Admin', 'Owner'], view: vContracts },
@@ -27,7 +27,7 @@ function navList() {
   for (const [key, p] of Object.entries(PAGES)) {
     if (!hasAny(p.roles)) continue;
     let label = p.label;
-    if (key === 'home') label = isTenant() ? 'Trang chủ' : 'Dashboard';
+    if (key === 'home') label = isTenant() ? 'Trang chủ' : 'Tổng quan';
     out.push({ key, label });
   }
   return out;
@@ -65,7 +65,7 @@ function renderNav() {
   const u = store.user || {};
   const box = document.getElementById('userbox');
   box.innerHTML = '<span>' + esc(u.fullName || u.username || '') + '</span>' +
-    '<span class="role">(' + esc((u.roles || []).join(', ')) + ')</span>' +
+    '<span class="role">(' + esc((u.roles || []).map(roleName).join(' · ')) + ')</span>' +
     '<button class="btn ghost sm" onclick="logout()">Thoát</button>';
 }
 
@@ -77,7 +77,8 @@ function renderLogin() {
     '<label>Tên đăng nhập</label><input id="lg_user" value="chutro" autocomplete="username">' +
     '<label>Mật khẩu</label><input id="lg_pass" type="password" value="123456" autocomplete="current-password">' +
     '<div style="margin-top:18px"><button class="btn" id="lg_btn" style="width:100%;justify-content:center">Đăng nhập</button></div>' +
-    '<div class="demo-hint"><b>Tài khoản demo:</b> chutro/123456 (Chủ trọ) · admin/123456 (Quản trị) · tenant1/123456 (Người thuê)</div>' +
+    '<div class="demo-hint"><b>Tài khoản demo:</b> chutro/123456 (Chủ trọ) · admin/123456 (Quản trị) · nguyenvana/123456 (Người thuê — tên = tài khoản)</div>' +
+    '<div class="muted small" style="text-align:center">Quên mật khẩu? Liên hệ Chủ trọ/Admin để đặt lại.</div>' +
     '</div></div>';
 }
 function bindLogin() {
@@ -126,7 +127,7 @@ async function vHome(view) {
     { t: 'Doanh thu tháng này', v: vnd(dash.revenueThisMonth) },
     { t: 'Công nợ', v: vnd(dash.totalOutstanding), s: dash.openInvoices + ' hóa đơn chưa trả đủ' }
   ];
-  let html = pageHead('Dashboard', '') + kpiCards(k) +
+  let html = pageHead('Tổng quan', '') + kpiCards(k) +
     '<div class="card"><h3 style="margin-top:0">📋 Công nợ chưa thu</h3>' +
     '<table><thead><tr><th>Hóa đơn</th><th>Phòng</th><th>Người thuê</th><th>Kỳ</th><th>Hạn</th><th class="num">Tổng</th><th class="num">Còn lại</th></tr></thead><tbody>';
   html += (debt.length ? debt.map(d =>
@@ -181,7 +182,7 @@ async function roomForm(id) {
     '<div><label>Giá phòng (₫/tháng)</label><input id="r_price" type="number" value="' + (r?.price ?? '') + '"></div>' +
     '<div><label>SL người tối đa</label><input id="r_max" type="number" value="' + (r?.maxPeople ?? 2) + '"></div>' +
     (r ? '<div><label>Trạng thái</label><select id="r_status">' +
-      ['Available', 'Rented', 'Maintenance'].map(s => '<option value="' + s + '"' + (r.status === s ? ' selected' : '') + '>' + s + '</option>').join('') + '</select></div>' : '') +
+      ['Available', 'Rented', 'Maintenance'].map(s => '<option value="' + s + '"' + (r.status === s ? ' selected' : '') + '>' + roomStatusName(s) + '</option>').join('') + '</select></div>' : '') +
     '<div style="grid-column:1/-1"><label>Ghi chú</label><input id="r_note" value="' + esc(r?.note || '') + '"></div>' +
     '</div>');
   b.appendChild(modalButtons('<button class="btn" onclick="roomSave(' + (id ?? 'null') + ')">Lưu</button>'));
@@ -206,13 +207,17 @@ async function roomDel(id) {
 /* ================= TENANTS ================= */
 async function vTenants(view) {
   const list = await api.get('/tenants');
+  window._tenants = list;
   view.innerHTML = pageHead('Người thuê', '<button class="btn" onclick="tenantForm()">+ Thêm người thuê</button>') +
-    '<div class="card"><table><thead><tr><th>Họ tên</th><th>SĐT</th><th>CCCD</th><th>Email</th><th>Trạng thái</th><th style="width:120px"></th></tr></thead><tbody>' +
+    '<div class="card"><table><thead><tr><th>Họ tên</th><th>SĐT</th><th>CCCD</th><th>Email</th><th>Trạng thái</th><th style="width:280px"></th></tr></thead><tbody>' +
     (list.length ? list.map(t =>
-      '<tr><td><b>' + esc(t.fullName) + '</b>' + (t.hasAccount ? ' ' + badge('có tài khoản', 'brand') : '') + '</td>' +
+      '<tr><td><b>' + esc(t.fullName) + '</b><br><span class="small">' + (t.hasAccount ? badge('có tài khoản', 'ok') : badge('chưa có tài khoản', 'warn')) + '</span></td>' +
       '<td>' + esc(t.phone || '—') + '</td><td>' + esc(t.identityNumber || '—') + '</td><td>' + esc(t.email || '—') + '</td>' +
       '<td>' + (t.isActive ? badge('Hoạt động', 'ok') : badge('Ngưng', 'bad')) + '</td>' +
-      '<td><button class="btn gray sm" onclick="tenantForm(' + t.id + ')">Sửa</button> ' +
+      '<td>' + (t.hasAccount
+        ? '<button class="btn gray sm" onclick="tenantPwModal(' + t.id + ')">Đặt lại MK</button> '
+        : '<button class="btn sm" onclick="tenantAccModal(' + t.id + ')">+ Tạo tài khoản</button> ') +
+      '<button class="btn gray sm" onclick="tenantForm(' + t.id + ')">Sửa</button> ' +
       '<button class="btn danger sm" onclick="tenantDel(' + t.id + ')">Xóa</button></td></tr>').join('') : emptyRow(6)) +
     '</tbody></table></div>';
 }
@@ -228,7 +233,15 @@ async function tenantForm(id) {
     '<div><label>Địa chỉ</label><input id="t_addr" value="' + esc(t?.address || '') + '"></div>' +
     '<div style="grid-column:1/-1"><label>Ghi chú</label><input id="t_note" value="' + esc(t?.note || '') + '"></div>' +
     (t ? '<div><label>Hoạt động</label><select id="t_active"><option value="true"' + (t.isActive ? ' selected' : '') + '>Hoạt động</option><option value="false"' + (!t.isActive ? ' selected' : '') + '>Ngưng</option></select></div>' : '') +
-    '</div>');
+    '</div>' +
+    (!t ? '<div style="margin-top:14px"><label style="display:flex;align-items:center;gap:8px;font-weight:normal"><input type="checkbox" id="t_acc"> Kèm tạo tài khoản đăng nhập cho người thuê này</label></div>' +
+    '<div id="t_acc_box" class="hidden" style="margin-top:10px;padding-top:10px;border-top:1px dashed #ddd">' +
+    '<label>Tên đăng nhập *</label><input id="t_acc_user">' + passInputs('tacc', 'Mật khẩu *') +
+    '<div class="muted small">Gợi ý: đặt theo tên không dấu, VD tranvanh.</div></div>' : ''));
+  if (!t) {
+    const cb = b.querySelector('#t_acc');
+    cb.addEventListener('change', () => b.querySelector('#t_acc_box').classList.toggle('hidden', !cb.checked));
+  }
   b.appendChild(modalButtons('<button class="btn" onclick="tenantSave(' + (id ?? 'null') + ')">Lưu</button>'));
 }
 async function tenantSave(id) {
@@ -237,6 +250,15 @@ async function tenantSave(id) {
     email: val('t_email') || null, address: val('t_addr') || null, note: val('t_note') || null
   };
   if (id) body.isActive = val('t_active') === 'true';
+  else {
+    const acc = document.getElementById('t_acc');
+    if (acc && acc.checked) {
+      const password = readNewPass('tacc');
+      if (!password) return;
+      body.username = val('t_acc_user');
+      body.password = password;
+    }
+  }
   try {
     if (id) await api.put('/tenants/' + id, body); else await api.post('/tenants', body);
     closeModal(); toast('Đã lưu'); route();
@@ -246,6 +268,38 @@ async function tenantDel(id) {
   if (!confirm('Xóa người thuê này?')) return;
   try { await api.del('/tenants/' + id); toast('Đã xóa'); route(); }
   catch (e) { toast(e.message, 'err'); }
+}
+
+/* ---- tài khoản đăng nhập của người thuê (Admin & Chủ trọ) ---- */
+async function tenantAccModal(id) {
+  const t = (window._tenants || []).find(x => x.id === id);
+  const b = openModal('Tạo tài khoản: ' + (t ? t.fullName : ''),
+    '<div class="muted small" style="margin:0 0 10px">Người thuê đăng nhập bằng tài khoản này để xem hợp đồng, hóa đơn và gửi yêu cầu sửa chữa.</div>' +
+    '<label>Tên đăng nhập *</label><input id="ta_user">' + passInputs('ta'));
+  b.appendChild(modalButtons('<button class="btn" onclick="tenantAccSave(' + id + ')">Tạo</button>'));
+}
+async function tenantAccSave(id) {
+  const password = readNewPass('ta');
+  if (!password) return;
+  try {
+    await api.post('/tenants/' + id + '/account', { username: val('ta_user'), password });
+    closeModal(); toast('Đã tạo tài khoản'); route();
+  } catch (e) { toast(e.message, 'err'); }
+}
+async function tenantPwModal(id) {
+  const t = (window._tenants || []).find(x => x.id === id);
+  const b = openModal('Đặt lại mật khẩu: ' + (t ? t.fullName : ''),
+    '<div class="muted small" style="margin:0 0 10px">Đặt mật khẩu mới cho tài khoản đăng nhập của người thuê này.</div>' +
+    passInputs('tp'));
+  b.appendChild(modalButtons('<button class="btn" onclick="tenantPwSave(' + id + ')">Lưu</button>'));
+}
+async function tenantPwSave(id) {
+  const password = readNewPass('tp');
+  if (!password) return;
+  try {
+    await api.put('/tenants/' + id + '/password', { newPassword: password });
+    closeModal(); toast('Đã đặt lại mật khẩu'); route();
+  } catch (e) { toast(e.message, 'err'); }
 }
 
 /* ================= CONTRACTS ================= */
@@ -311,6 +365,8 @@ async function contractTerm(id) {
 
 /* ================= METER ================= */
 let meterRooms = [];
+let meterInfo = null; // giá điện/nước theo hợp đồng của phòng đang chọn (MeterBillingInfoDto)
+
 async function vMeter(view) {
   meterRooms = await api.get('/rooms');
   view.innerHTML = pageHead('Ghi chỉ số điện nước', '') +
@@ -321,21 +377,72 @@ async function vMeter(view) {
 }
 async function meterLoad() {
   const roomId = num('m_room');
-  if (!roomId) return;
-  const list = await api.get('/meter-readings/room/' + roomId);
-  document.getElementById('m_table').innerHTML =
-    '<table><thead><tr><th>Ngày ghi</th><th class="num">Điện (kWh)</th><th class="num">Nước (m³)</th><th>Ghi chú</th></tr></thead><tbody>' +
-    (list.length ? list.map(m =>
-      '<tr><td>' + fmtDate(m.readingDate) + '</td><td class="num">' + m.electricIndex + '</td><td class="num">' + m.waterIndex + '</td><td>' + esc(m.note || '') + '</td></tr>').join('') : emptyRow(4)) +
-    '</tbody></table>';
+  if (!roomId) { document.getElementById('m_table').innerHTML = '<div class="empty">Chọn phòng…</div>'; return; }
+  const [list, info] = await Promise.all([
+    api.get('/meter-readings/room/' + roomId),
+    api.get('/meter-readings/room/' + roomId + '/billing-info')
+  ]);
+  meterInfo = info;
+  renderMeterTable(list, info);
+}
+function renderMeterTable(list, info) {
+  const ep = Number(info.electricPrice) || 0, wp = Number(info.waterPrice) || 0;
+  const hasContract = ep > 0 || wp > 0;
+  const byAsc = [...list].sort((a, b) => new Date(a.readingDate) - new Date(b.readingDate) || (a.id - b.id));
+  let pe = null, pw = null;
+  const rows = byAsc.map(m => {
+    const r = {
+      m,
+      ke: pe == null ? null : m.electricIndex - pe,
+      kw: pw == null ? null : m.waterIndex - pw
+    };
+    pe = m.electricIndex; pw = m.waterIndex;
+    return r;
+  }).reverse(); // bản ghi mới nhất lên đầu
+  const head = hasContract
+    ? '<div class="muted small" style="margin-bottom:8px">Giá theo hợp đồng: Điện <b>' + vnd(ep) + '/kWh</b> · Nước <b>' + vnd(wp) + '/m³</b> — "Tiền ước tính" = chênh lệch 2 lần ghi liền kề × đơn giá.</div>'
+    : '<div class="muted small" style="margin-bottom:8px">Phòng này chưa có hợp đồng hiệu lực nên chưa tính được tiền.</div>';
+  document.getElementById('m_table').innerHTML = head +
+    '<table><thead><tr><th>Ngày ghi</th><th class="num">Điện (kWh)</th><th class="num">Nước (m³)</th>' +
+    '<th class="num">Điện dùng</th><th class="num">Nước dùng</th><th class="num">Tiền ước tính</th><th>Ghi chú</th></tr></thead><tbody>' +
+    (rows.length ? rows.map(r =>
+      '<tr><td>' + fmtDate(r.m.readingDate) + '</td><td class="num">' + dnum(r.m.electricIndex) + '</td><td class="num">' + dnum(r.m.waterIndex) + '</td>' +
+      '<td class="num">' + (r.ke == null ? '—' : dnum(r.ke) + ' kWh') + '</td><td class="num">' + (r.kw == null ? '—' : dnum(r.kw) + ' m³') + '</td>' +
+      '<td class="num">' + (r.ke != null && hasContract ? vnd(r.ke * ep + r.kw * wp) : '—') + '</td><td>' + esc(r.m.note || '') + '</td></tr>').join('')
+      : emptyRow(7)) + '</tbody></table>';
 }
 function meterForm() {
+  const info = meterInfo || {};
+  const ep = Number(info.electricPrice) || 0, wp = Number(info.waterPrice) || 0;
+  const hasContract = ep > 0 || wp > 0;
+  const le = info.lastElectricIndex, lw = info.lastWaterIndex;
+  const priceLine = hasContract
+    ? 'Giá theo hợp đồng: điện ' + vnd(ep) + '/kWh · nước ' + vnd(wp) + '/m³.'
+    : 'Phòng chưa có hợp đồng hiệu lực — chưa tính được tiền.';
   const b = openModal('Ghi chỉ số mới',
+    '<div class="muted small" style="margin-top:6px">' +
+    (le == null
+      ? 'Chưa có chỉ số trước — đây là chỉ số đầu tiên của phòng. '
+      : 'Chỉ số gần nhất: điện ' + dnum(le) + ' · nước ' + dnum(lw) + ' (' + fmtDate(info.lastReadingDate) + '). ') +
+    priceLine + '</div>' +
     '<div class="form-grid">' +
     '<div><label>Ngày ghi</label><input id="m_date" type="date" value="' + todayStr() + '"></div>' +
-    '<div><label>Điện (kWh)</label><input id="m_e" type="number" value="0" step="any"></div>' +
-    '<div><label>Nước (m³)</label><input id="m_w" type="number" value="0" step="any"></div>' +
-    '</div>');
+    '<div><label>Điện (kWh)</label><input id="m_e" type="number" value="' + (le == null ? '' : le) + '" step="any"></div>' +
+    '<div><label>Nước (m³)</label><input id="m_w" type="number" value="' + (lw == null ? '' : lw) + '" step="any"></div>' +
+    '</div>' +
+    '<div id="m_est" class="muted small" style="min-height:16px"></div>');
+  const est = b.querySelector('#m_est');
+  const upd = () => {
+    const e = num('m_e'), w = num('m_w');
+    if (le == null && lw == null) { est.textContent = 'Đây là chỉ số đầu tiên — mốc so sánh cho các kỳ sau.'; return; }
+    const ke = e - (le || 0), kw = w - (lw || 0);
+    if (ke < 0 || kw < 0) { est.textContent = '⚠️ Chỉ số mới nhỏ hơn chỉ số gần nhất — máy chủ sẽ từ chối lưu.'; return; }
+    est.textContent = hasContract
+      ? 'Dự kiến: điện ' + dnum(ke) + ' kWh × ' + vnd(ep) + ' = ' + vnd(ke * ep) + ' · nước ' + dnum(kw) + ' m³ × ' + vnd(wp) + ' = ' + vnd(kw * wp)
+      : '';
+  };
+  ['m_e', 'm_w'].forEach(id => { const el = b.querySelector('#' + id); if (el) el.addEventListener('input', upd); });
+  upd();
   b.appendChild(modalButtons('<button class="btn" onclick="meterSave()">Lưu</button>'));
 }
 async function meterSave() {
@@ -350,7 +457,7 @@ async function vInvoices(view) {
   view.innerHTML = pageHead('Hóa đơn tiền thuê', '<button class="btn" onclick="invoiceForm()">+ Lập hóa đơn</button>') +
     '<div class="filters"><label style="margin:0">Kỳ</label><input id="f_inv_month" type="month" value="' + month + '" onchange="invFilter()">' +
     '<select id="f_inv_status" onchange="invFilter()"><option value="">Tất cả trạng thái</option>' +
-    ['Unpaid', 'PartiallyPaid', 'Paid', 'Cancelled'].map(s => '<option value="' + s + '">' + s + '</option>').join('') + '</select></div>' +
+    ['Unpaid', 'PartiallyPaid', 'Paid', 'Cancelled'].map(s => '<option value="' + s + '">' + invoiceStatusName(s) + '</option>').join('') + '</select></div>' +
     '<div id="inv_table"></div>';
   invFilter();
 }
@@ -372,15 +479,19 @@ async function invFilter() {
 async function invoiceForm() {
   const rooms = await api.get('/rooms');
   const b = openModal('Lập hóa đơn theo kỳ (tự tính điện/nước)',
-    '<div class="small muted" style="margin-top:6px">Chương trình tự tìm hợp đồng còn hiệu lực, lấy chỉ số đồng hồ đầu/cuối kỳ và cộng tiền phòng.</div>' +
+    '<div class="small muted" style="margin-top:6px">Chương trình tự tìm hợp đồng còn hiệu lực, lấy chỉ số đồng hồ đầu/cuối kỳ, nhân theo đơn giá trong hợp đồng và cộng tiền phòng.</div>' +
     '<div class="form-grid">' +
     '<div><label>Phòng</label><select id="i_room">' + selOpts(rooms, null, o => o.name) + '</select></div>' +
     '<div><label>Kỳ thanh toán</label><input id="i_month" type="month" value="' + monthNow() + '"></div>' +
     '<div><label>Hạn thanh toán</label><input id="i_due" type="date"></div>' +
     '</div>' +
     '<label>Khoản phí thêm (không bắt buộc)</label><div id="extraRows"></div>' +
-    '<button class="btn gray sm" onclick="addExtra()" style="margin-top:6px">+ Thêm khoản phí</button>');
+    '<button class="btn gray sm" onclick="addExtra()" style="margin-top:6px">+ Thêm khoản phí</button>' +
+    '<div id="inv_preview"></div>');
   addExtra();
+  b.addEventListener('input', refreshInvPreview);
+  b.addEventListener('change', refreshInvPreview);
+  refreshInvPreview();
   b.appendChild(modalButtons('<button class="btn" onclick="invoiceSave()">Lập hóa đơn</button>'));
 }
 function addExtra() {
@@ -390,8 +501,40 @@ function addExtra() {
   d.style.cssText = 'display:flex;gap:8px;margin-top:6px';
   d.innerHTML = '<input class="ex-name" placeholder="Tên phí (VD: Phí vệ sinh)" style="flex:2">' +
     '<input class="ex-amount" type="number" placeholder="Số tiền" style="flex:1">' +
-    '<button class="btn gray sm" onclick="this.parentNode.remove()">✕</button>';
+    '<button class="btn gray sm" onclick="this.parentNode.remove();refreshInvPreview()">✕</button>';
   rows.appendChild(d);
+}
+let _invPrevTimer = null;
+function refreshInvPreview() {
+  clearTimeout(_invPrevTimer);
+  _invPrevTimer = setTimeout(async () => {
+    const box = document.getElementById('inv_preview');
+    if (!box) return;
+    const roomId = num('i_room'), month = val('i_month');
+    if (!roomId || !month) { box.innerHTML = '<div class="muted small">Chọn phòng và kỳ để xem dự toán.</div>'; return; }
+    const extras = [];
+    document.querySelectorAll('#extraRows > div').forEach(d => {
+      const n = d.querySelector('.ex-name').value.trim(), a = parseFloat(d.querySelector('.ex-amount').value);
+      if (n && !isNaN(a) && a > 0) extras.push({ name: n, amount: a });
+    });
+    box.innerHTML = '<div class="muted small">Đang tính dự toán…</div>';
+    try {
+      const p = await api.post('/invoices/preview', { roomId, billingMonth: month, extraItems: extras.length ? extras : null });
+      box.innerHTML = renderInvPreview(p);
+    } catch (e) {
+      box.innerHTML = '<div class="empty" style="padding:8px">' + esc(e.message) + '</div>';
+    }
+  }, 250);
+}
+function renderInvPreview(p) {
+  const rows = (p.items || []).map(x =>
+    '<tr><td>' + esc(x.name) + '</td><td>' + (x.unit ? dnum(x.quantity) + ' ' + esc(x.unit) : '—') + '</td><td>' + vnd(x.unitPrice) + '</td><td class="num">' + vnd(x.amount) + '</td></tr>').join('') ||
+    '<tr><td colspan="4" class="empty">Không có khoản nào</td></tr>';
+  return '<div class="card" style="margin-top:12px;padding:12px">' +
+    '<h4 style="margin-top:0">🧾 Dự toán — ' + esc(p.roomName) + (p.tenantName ? ' (' + esc(p.tenantName) + ')' : '') + '</h4>' +
+    '<table><thead><tr><th>Khoản</th><th>SL</th><th>Đơn giá</th><th class="num">Thành tiền</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<div style="display:flex;justify-content:space-between;margin-top:6px" class="small muted"><span>Nợ các kỳ trước (hiển thị riêng, chưa cộng vào tổng)</span><b>' + vnd(p.previousDebt) + '</b></div>' +
+    '<div style="text-align:right;font-weight:700;font-size:15px;margin-top:4px">Dự kiến tổng hóa đơn: ' + vnd(p.totalAmount) + '</div></div>';
 }
 async function invoiceSave() {
   const extras = [];
@@ -416,8 +559,8 @@ async function invoiceView(id) {
     (i.items || []).map(x => '<tr><td>' + esc(x.name) + '</td><td>' + (x.unit ? x.quantity + ' ' + esc(x.unit) : '') + '</td><td>' + vnd(x.unitPrice) + '</td><td class="num">' + vnd(x.amount) + '</td></tr>').join('') +
     '</tbody></table><div style="text-align:right;font-weight:700;font-size:16px;margin:8px 0">Tổng: ' + vnd(i.totalAmount) + '</div>' +
     '<h4>Lịch sử thanh toán</h4>' + (i.payments && i.payments.length ?
-      '<table><thead><tr><th>Ngày</th><th class="num">Số tiền</th><th>Phương thức</th></tr></thead><tbody>' +
-      i.payments.map(p => '<tr><td>' + fmtDate(p.paidAt) + '</td><td class="num">' + vnd(p.amount) + '</td><td>' + esc(p.methodName) + '</td></tr>').join('') + '</tbody></table>'
+      '<table><thead><tr><th>Ngày</th><th class="num">Số tiền</th><th>Phương thức</th><th>Mã giao dịch</th><th>Ghi chú</th></tr></thead><tbody>' +
+      i.payments.map(p => '<tr><td>' + fmtDate(p.paidAt) + '</td><td class="num">' + vnd(p.amount) + '</td><td>' + esc(p.methodName) + '</td><td>' + esc(p.reference || '—') + '</td><td>' + esc(p.note || '—') + '</td></tr>').join('') + '</tbody></table>'
       : '<div class="empty" style="padding:10px">Chưa có thanh toán</div>') +
     (rem > 0 ? '<div id="payBlock" style="margin-top:14px;border-top:1px solid var(--line);padding-top:10px">' +
       '<div class="detail-row"><span>Còn phải thu</span><b>' + vnd(rem) + '</b></div>' +
@@ -430,7 +573,19 @@ async function invoiceView(id) {
       : '<div class="muted small" style="margin-top:8px">✅ Đã thanh toán đủ.</div>'));
 }
 function methodName(m) {
-  return { Cash: 'Tiền mặt', BankTransfer: 'Chuyển khoản', Momo: 'Momo', VnPay: 'VNPay', Other: 'Khác' }[m] || m;
+  return { Cash: 'Tiền mặt', BankTransfer: 'Chuyển khoản', Momo: 'Ví Momo', VnPay: 'Cổng VNPay', Other: 'Khác' }[m] || m;
+}
+function roleName(c) {
+  return { Admin: 'Quản trị viên', Owner: 'Chủ trọ', Tenant: 'Người thuê' }[c] || c;
+}
+function roomStatusName(s) {
+  return { Available: 'Trống', Rented: 'Đang cho thuê', Maintenance: 'Đang bảo trì' }[s] || s;
+}
+function invoiceStatusName(s) {
+  return { Unpaid: 'Chưa thanh toán', PartiallyPaid: 'Thanh toán một phần', Paid: 'Đã thanh toán', Cancelled: 'Đã hủy' }[s] || s;
+}
+function repairStatusName(s) {
+  return { Pending: 'Chờ xử lý', Approved: 'Đã tiếp nhận', InProgress: 'Đang xử lý', Completed: 'Đã hoàn thành', Rejected: 'Từ chối', Cancelled: 'Đã hủy' }[s] || s;
 }
 async function paySave(id) {
   const amount = num('pay_amount');
@@ -576,33 +731,51 @@ async function exportCsv() {
 
 /* ================= USERS (admin) ================= */
 async function vUsers(view) {
-  const [users, roles] = await Promise.all([api.get('/admin/users'), api.get('/admin/roles')]);
+  const [users] = await Promise.all([api.get('/admin/users')]);
   view.innerHTML = pageHead('Quản lý người dùng', '<button class="btn" onclick="userForm()">+ Tạo người dùng</button>') +
-    '<div class="card"><table><thead><tr><th>Username</th><th>Họ tên</th><th>Vai trò</th><th>Trạng thái</th><th style="width:210px"></th></tr></thead><tbody>' +
+    '<div class="muted small" style="margin-bottom:10px">Tạo tài khoản <b>Chủ trọ</b> tại đây. Tài khoản <b>Người thuê</b> được tạo gắn với hồ sơ ở trang <b>Người thuê</b>.</div>' +
+    '<div class="card"><table><thead><tr><th>Username</th><th>Họ tên</th><th>Vai trò</th><th>Trạng thái</th><th style="width:300px"></th></tr></thead><tbody>' +
     (users.length ? users.map(u =>
-      '<tr><td><b>' + esc(u.username) + '</b></td><td>' + esc(u.fullName) + '</td><td>' + (u.roles || []).map(r => badge(r, 'brand')).join(' ') + '</td>' +
+      '<tr><td><b>' + esc(u.username) + '</b></td><td>' + esc(u.fullName) + '</td><td>' + (u.roles || []).map(r => badge(roleName(r), 'brand')).join(' ') + '</td>' +
       '<td>' + (u.isActive ? badge('Hoạt động', 'ok') : badge('Bị khóa', 'bad')) + '</td>' +
-      '<td><button class="btn gray sm" onclick="userRoles(' + u.id + ')">Gán vai trò</button> ' +
+      '<td><button class="btn gray sm" onclick="userPwModal(' + u.id + ')">Đặt lại MK</button> ' +
+      '<button class="btn gray sm" onclick="userRoles(' + u.id + ')">Vai trò</button> ' +
       '<button class="btn ' + (u.isActive ? 'danger' : 'ok') + ' sm" onclick="userToggle(' + u.id + ',' + u.isActive + ')">' + (u.isActive ? 'Khóa' : 'Mở khóa') + '</button></td></tr>').join('') : emptyRow(5)) +
     '</tbody></table></div>';
 }
 async function userForm() {
   const roles = await api.get('/admin/roles');
+  const creatable = roles.filter(r => r.code !== 'Tenant'); // tài khoản Tenant tạo ở trang Người thuê
   const b = openModal('Tạo người dùng mới',
     '<div class="form-grid">' +
     '<div><label>Username *</label><input id="u_user"></div>' +
     '<div><label>Mật khẩu *</label><input id="u_pass" type="password"></div>' +
     '<div><label>Họ tên *</label><input id="u_name"></div>' +
-    '</div><label>Vai trò</label><div id="u_roles">' +
-    roles.map(r => '<label style="display:flex;align-items:center;gap:8px;font-weight:normal"><input type="checkbox" class="urc" value="' + r.code + '"' + (r.code === 'Tenant' ? ' checked' : '') + '> ' + esc(r.name) + '</label>').join('') +
-    '</div>');
+    '</div>' +
+    (creatable.length
+      ? '<label>Vai trò</label><div>' + creatable.map(r =>
+          '<label style="display:flex;align-items:center;gap:8px;font-weight:normal"><input type="checkbox" class="urc" value="' + r.code + '"' + (r.code === 'Owner' ? ' checked' : '') + '> ' + esc(r.name) + '</label>').join('') + '</div>'
+      : '<input type="hidden" class="urc" value="Owner">') +
+    '<div class="muted small">Tài khoản Người thuê được tạo ở trang Người thuê (luôn gắn với hồ sơ).</div>');
   b.appendChild(modalButtons('<button class="btn" onclick="userCreate()">Tạo</button>'));
 }
 async function userCreate() {
   const roles = [...document.querySelectorAll('.urc:checked')].map(c => c.value);
-  const body = { username: val('u_user'), password: val('u_pass'), fullName: val('u_name'), roles };
+  const body = { username: val('u_user'), password: val('u_pass'), fullName: val('u_name'), roles: roles.length ? roles : ['Owner'] };
   try { await api.post('/admin/users', body); closeModal(); toast('Đã tạo'); route(); }
   catch (e) { toast(e.message, 'err'); }
+}
+async function userPwModal(id) {
+  const b = openModal('Đặt lại mật khẩu', passInputs('up'));
+  b.appendChild(modalButtons('<button class="btn" onclick="userPwSave(' + id + ')">Lưu</button>'));
+}
+async function userPwSave(id) {
+  const password = readNewPass('up');
+  if (!password) return;
+  try {
+    await api.put('/admin/users/' + id + '/password', { newPassword: password });
+    closeModal(); toast('Đã đặt lại mật khẩu'); route();
+  } catch (e) { toast(e.message, 'err'); }
 }
 async function userRoles(id) {
   const [roles] = await Promise.all([api.get('/admin/roles')]);
@@ -635,14 +808,19 @@ async function vMyContracts(view) {
 }
 async function vMyInvoices(view) {
   const list = await api.get('/me/invoices');
+  window._myInv = list;
   view.innerHTML = pageHead('Hóa đơn của tôi', '') +
-    '<div class="card"><table><thead><tr><th>Mã</th><th>Phòng</th><th>Kỳ</th><th>Hạn</th><th class="num">Tổng</th><th class="num">Đã trả</th><th class="num">Còn lại</th><th>Trạng thái</th><th></th></tr></thead><tbody>' +
-    (list.length ? list.map(i =>
-      '<tr><td>' + esc(i.invoiceCode) + '</td><td><b>' + esc(i.roomName) + '</b></td><td>' + esc(i.billingMonth) + '</td><td>' + fmtDate(i.dueDate) + '</td>' +
-      '<td class="num">' + vnd(i.totalAmount) + '</td><td class="num">' + vnd(i.paidAmount) + '</td><td class="num"><b>' + vnd(Math.max(0, i.totalAmount - i.paidAmount)) + '</b></td>' +
+    '<div class="card"><table><thead><tr><th>Mã</th><th>Phòng</th><th>Kỳ</th><th>Hạn</th><th class="num">Tổng</th><th class="num">Đã trả</th><th class="num">Còn lại</th><th>Trạng thái</th><th style="width:200px"></th></tr></thead><tbody>' +
+    (list.length ? list.map(i => {
+      const rem = Math.max(0, i.totalAmount - i.paidAmount);
+      return '<tr><td>' + esc(i.invoiceCode) + '</td><td><b>' + esc(i.roomName) + '</b></td><td>' + esc(i.billingMonth) + '</td><td>' + fmtDate(i.dueDate) + '</td>' +
+      '<td class="num">' + vnd(i.totalAmount) + '</td><td class="num">' + vnd(i.paidAmount) + '</td><td class="num"><b>' + vnd(rem) + '</b></td>' +
       '<td>' + statusBadge(i.statusName) + '</td>' +
-      '<td><button class="btn gray sm" onclick="myInvoice(' + i.id + ')">Chi tiết</button></td></tr>').join('') : emptyRow(9)) +
-    '</tbody></table></div>';
+      '<td style="white-space:nowrap">' + (rem > 0 ? '<button class="btn ok sm" onclick="myPayModal(' + i.id + ')">Thanh toán</button> ' : '') +
+      '<button class="btn gray sm" onclick="myInvoice(' + i.id + ')">Chi tiết</button></td></tr>';
+    }).join('') : emptyRow(9)) +
+    '</tbody></table></div>' +
+    (list.length && list.every(x => x.totalAmount - x.paidAmount <= 0) ? '<div class="empty">Tất cả hóa đơn của bạn đã thanh toán đủ 🎉</div>' : '');
 }
 async function myInvoice(id) {
   const i = await api.get('/me/invoices/' + id);
@@ -655,10 +833,37 @@ async function myInvoice(id) {
     (i.items || []).map(x => '<tr><td>' + esc(x.name) + (x.unit ? ' <span class="small muted">(' + x.quantity + ' ' + esc(x.unit) + ')</span>' : '') + '</td><td class="num">' + vnd(x.amount) + '</td></tr>').join('') +
     '</tbody></table><div style="text-align:right;font-weight:700;font-size:16px;margin-top:6px">Tổng: ' + vnd(i.totalAmount) + '</div>' +
     '<h4>Thanh toán</h4>' + (i.payments && i.payments.length ?
-      '<table><thead><tr><th>Ngày</th><th class="num">Số tiền</th><th>Phương thức</th></tr></thead><tbody>' +
-      i.payments.map(p => '<tr><td>' + fmtDate(p.paidAt) + '</td><td class="num">' + vnd(p.amount) + '</td><td>' + esc(p.methodName) + '</td></tr>').join('') + '</tbody></table>'
+      '<table><thead><tr><th>Ngày</th><th class="num">Số tiền</th><th>Phương thức</th><th>Mã giao dịch</th><th>Ghi chú</th></tr></thead><tbody>' +
+      i.payments.map(p => '<tr><td>' + fmtDate(p.paidAt) + '</td><td class="num">' + vnd(p.amount) + '</td><td>' + esc(p.methodName) + '</td><td>' + esc(p.reference || '—') + '</td><td>' + esc(p.note || '—') + '</td></tr>').join('') + '</tbody></table>'
       : '<div class="empty" style="padding:10px">Chưa thanh toán</div>'));
-  b.appendChild(modalButtons(''));
+  const rem = i.totalAmount - i.paidAmount;
+  b.appendChild(modalButtons(rem > 0
+    ? '<button class="btn ok" onclick="closeModal();myPayModal(' + i.id + ')">Thanh toán ' + vnd(rem) + '</button>'
+    : ''));
+}
+async function myPayModal(id) {
+  const inv = (window._myInv || []).find(x => x.id === id);
+  if (!inv) return toast('Không tìm thấy hóa đơn.', 'err');
+  const rem = Math.max(0, inv.totalAmount - inv.paidAmount);
+  if (!(rem > 0)) return toast('Hóa đơn này đã thanh toán đủ.', 'err');
+  const b = openModal('Thanh toán hóa đơn ' + inv.invoiceCode,
+    rowsOf([
+      ['Phòng', inv.roomName], ['Kỳ', inv.billingMonth],
+      ['Tổng hóa đơn', vnd(inv.totalAmount)], ['Đã thanh toán', vnd(inv.paidAmount)],
+      ['Còn phải trả', vnd(rem)]
+    ]) +
+    '<div class="muted small" style="margin:4px 0 6px">💳 Thanh toán trực tuyến (giả lập): ghi nhận ngay, Chủ trọ sẽ thấy khoản này để đối chiếu.</div>' +
+    '<label>Phương thức</label><select id="mp_method">' +
+    ['BankTransfer', 'Momo', 'VnPay'].map(m => '<option value="' + m + '">' + methodName(m) + '</option>').join('') + '</select>' +
+    '<label>Mã giao dịch (bỏ trống cũng được)</label><input id="mp_ref">' +
+    '<label>Ghi chú (tuỳ chọn)</label><input id="mp_note">');
+  b.appendChild(modalButtons('<button class="btn ok" onclick="myPaySave(' + id + ')">Xác nhận thanh toán ' + vnd(rem) + '</button>'));
+}
+async function myPaySave(id) {
+  try {
+    await api.post('/me/invoices/' + id + '/pay', { method: val('mp_method'), reference: val('mp_ref') || null, note: val('mp_note') || null });
+    closeModal(); toast('Đã thanh toán! Chủ trọ sẽ thấy khoản này để kiểm tra.'); route();
+  } catch (e) { toast(e.message, 'err'); }
 }
 async function vMyRepairs(view) {
   const list = await api.get('/me/repair-requests');
@@ -698,6 +903,18 @@ function rowsOf(rows) {
   return '<div style="margin:10px 0">' + rows.map(([k, v]) =>
     '<div class="detail-row"><span>' + esc(k) + '</span><span style="margin-left:18px;text-align:right">' +
     (typeof v === 'string' && /^<span class="badge/.test(v) ? v : esc(v)) + '</span></div>').join('') + '</div>';
+}
+/* 2 ô mật khẩu (nhập + nhập lại) dùng chung cho các modal đặt mật khẩu/tạo tài khoản. */
+function passInputs(prefix, label) {
+  return '<label>' + (label || 'Mật khẩu mới *') + ' (tối thiểu 6 ký tự)</label><input id="' + prefix + '_p1" type="password">' +
+    '<label>Nhập lại mật khẩu *</label><input id="' + prefix + '_p2" type="password">';
+}
+function readNewPass(prefix) {
+  const a = val(prefix + '_p1'), b = val(prefix + '_p2');
+  if (!a) { toast('Nhập mật khẩu.', 'err'); return null; }
+  if (a.length < 6) { toast('Mật khẩu phải có ít nhất 6 ký tự.', 'err'); return null; }
+  if (a !== b) { toast('Mật khẩu nhập lại không khớp.', 'err'); return null; }
+  return a;
 }
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 function monthNow() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }

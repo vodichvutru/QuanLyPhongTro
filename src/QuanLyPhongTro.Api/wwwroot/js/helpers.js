@@ -62,6 +62,7 @@ async function apiDownload(path, filename) {
 
 /* ---------- định dạng ---------- */
 function vnd(x) { const n = Number(x) || 0; return n.toLocaleString('vi-VN', { maximumFractionDigits: 0 }) + ' ₫'; }
+function dnum(x) { const n = Number(x) || 0; return n.toLocaleString('vi-VN', { maximumFractionDigits: 2 }); }
 function fmtDate(iso) {
   if (!iso) return '—';
   const d = new Date(iso);

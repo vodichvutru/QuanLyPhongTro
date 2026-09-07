@@ -62,9 +62,12 @@ public class InvoiceService
             _db.Invoices.Remove(existing);
 
         var (opening, closing) = await FindReadingPairAsync(request.RoomId, monthStart, monthEnd);
+        // Chưa có chỉ số "đóng kỳ" (còn đang ghi, hoặc chưa ghi) → coi tiêu thụ kỳ này = 0, không được tính ra số âm.
+        var electricOpening = opening?.ElectricIndex ?? 0;
+        var waterOpening = opening?.WaterIndex ?? 0;
         var (kwh, m3) = InvoiceCalculator.ComputeUsage(
-            opening?.ElectricIndex ?? 0, closing?.ElectricIndex ?? 0,
-            opening?.WaterIndex ?? 0, closing?.WaterIndex ?? 0);
+            electricOpening, closing?.ElectricIndex ?? electricOpening,
+            waterOpening, closing?.WaterIndex ?? waterOpening);
 
         var items = InvoiceCalculator.BuildItems(
             room.Name, contract.MonthlyRent, kwh, contract.ElectricPrice, m3, contract.WaterPrice,
@@ -98,6 +101,47 @@ public class InvoiceService
         await _db.SaveChangesAsync();
 
         return DtoMapper.ToInvoice(await QueryDetailedAsync(invoice.Id) ?? invoice);
+    }
+
+    /// <summary>
+    /// Dự toán hóa đơn theo kỳ (không lưu): xem trước các khoản khi "Lập hóa đơn".
+    /// Dùng cùng logic của CreateAsync (hợp đồng hiệu lực + cặp chỉ số điện/nước + nợ kỳ trước).
+    /// </summary>
+    public async Task<InvoicePreviewDto> PreviewAsync(CreateInvoiceRequest request)
+    {
+        var (year, month) = ParseMonth(request.BillingMonth);
+        var monthStart = new DateTime(year, month, 1);
+        var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+
+        var room = await _db.Rooms.AsNoTracking().FirstOrDefaultAsync(r => r.Id == request.RoomId)
+            ?? throw new AppException("Không tìm thấy phòng.", 404);
+
+        var contract = await _db.Contracts.AsNoTracking()
+            .Include(c => c.Tenant)
+            .Where(c => c.RoomId == request.RoomId && c.Status == ContractStatus.Active
+                        && c.StartDate <= monthEnd
+                        && (c.EndDate == null || c.EndDate.Value >= monthStart))
+            .OrderByDescending(c => c.StartDate)
+            .FirstOrDefaultAsync()
+            ?? throw new AppException($"Không tìm thấy hợp đồng còn hiệu lực cho phòng {room.Name} trong kỳ {request.BillingMonth}.");
+
+        var (opening, closing) = await FindReadingPairAsync(request.RoomId, monthStart, monthEnd);
+        // Chưa có chỉ số "đóng kỳ" → coi tiêu thụ kỳ này = 0 (không tính ra số âm).
+        var electricOpening = opening?.ElectricIndex ?? 0;
+        var waterOpening = opening?.WaterIndex ?? 0;
+        var (kwh, m3) = InvoiceCalculator.ComputeUsage(
+            electricOpening, closing?.ElectricIndex ?? electricOpening,
+            waterOpening, closing?.WaterIndex ?? waterOpening);
+
+        var items = InvoiceCalculator.BuildItems(
+            room.Name, contract.MonthlyRent, kwh, contract.ElectricPrice, m3, contract.WaterPrice,
+            request.ExtraItems);
+        var monthLabel = $"{year:0000}-{month:00}";
+        var previousDebt = await SumUnpaidOlderAsync(contract.Id, monthLabel);
+
+        return new InvoicePreviewDto(
+            room.Name, contract.Tenant?.FullName, monthLabel, InvoiceCalculator.SumItems(items), previousDebt,
+            items.Select(s => new InvoiceItemDto(0, s.Name, s.Quantity, s.Unit, s.UnitPrice, s.Amount)).ToList());
     }
 
     /// <summary>Hủy hóa đơn (chỉ khi chưa có thanh toán).</summary>

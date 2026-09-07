@@ -34,6 +34,9 @@ public record UpdateUserRolesRequest(List<string> Roles);
 
 public record SetUserActiveRequest(bool IsActive);
 
+/// <summary>Đặt lại mật khẩu cho một tài khoản (quản trị thao tác hộ).</summary>
+public record ResetPasswordRequest(string NewPassword);
+
 public record RoleDto(int Id, string Code, string Name, string? Description);
 
 // ---------------- Rooms ----------------
@@ -87,7 +90,12 @@ public record CreateTenantRequest(
     string? IdentityNumber = null,
     string? Email = null,
     string? Address = null,
-    string? Note = null);
+    string? Note = null,
+    string? Username = null,
+    string? Password = null);
+
+/// <summary>Tạo tài khoản đăng nhập (role Tenant) gắn với một hồ sơ người thuê.</summary>
+public record CreateTenantAccountRequest(string Username, string Password);
 
 public record UpdateTenantRequest(
     string FullName,
@@ -150,6 +158,16 @@ public record CreateMeterReadingRequest(
     decimal WaterIndex,
     string? Note = null);
 
+/// <summary>Giá điện/nước theo hợp đồng đang hiệu lực + chỉ số gần nhất — dùng để ước tính tiền khi ghi chỉ số.</summary>
+public record MeterBillingInfoDto(
+    int RoomId,
+    string RoomName,
+    decimal ElectricPrice,
+    decimal WaterPrice,
+    decimal? LastElectricIndex,
+    decimal? LastWaterIndex,
+    DateTime? LastReadingDate);
+
 // ---------------- Invoices ----------------
 
 public class ExtraFeeLine
@@ -196,6 +214,15 @@ public record CreateInvoiceRequest(
     string? Note = null,
     List<ExtraFeeLine>? ExtraItems = null);
 
+/// <summary>Dự toán hóa đơn (xem trước khi lưu): các khoản + tổng + nợ kỳ trước.</summary>
+public record InvoicePreviewDto(
+    string RoomName,
+    string? TenantName,
+    string BillingMonth,
+    decimal TotalAmount,
+    decimal PreviousDebt,
+    IReadOnlyList<InvoiceItemDto> Items);
+
 // ---------------- Payments ----------------
 
 public record PaymentDto(
@@ -214,6 +241,12 @@ public record CreatePaymentRequest(
     decimal Amount,
     PaymentMethod Method,
     DateTime? PaidAt = null,
+    string? Reference = null,
+    string? Note = null);
+
+/// <summary>Người thuê thanh toán trực tuyến (thanh toán đủ số còn thiếu của hóa đơn).</summary>
+public record CreateMyPaymentRequest(
+    PaymentMethod Method,
     string? Reference = null,
     string? Note = null);
 

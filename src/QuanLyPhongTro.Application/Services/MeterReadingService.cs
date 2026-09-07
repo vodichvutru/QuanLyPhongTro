@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using QuanLyPhongTro.Application.Common;
 using QuanLyPhongTro.Application.Dtos;
 using QuanLyPhongTro.Core.Entities;
+using QuanLyPhongTro.Core.Enums;
 using QuanLyPhongTro.Infrastructure.Data;
 
 namespace QuanLyPhongTro.Application.Services;
@@ -11,6 +12,30 @@ public class MeterReadingService
     private readonly AppDbContext _db;
 
     public MeterReadingService(AppDbContext db) => _db = db;
+
+    /// <summary>Giá điện/nước theo hợp đồng đang hiệu lực + chỉ số gần nhất của phòng — để ước tính tiền khi ghi chỉ số.</summary>
+    public async Task<MeterBillingInfoDto> GetBillingInfoAsync(int roomId)
+    {
+        var room = await _db.Rooms.AsNoTracking().FirstOrDefaultAsync(r => r.Id == roomId)
+            ?? throw new AppException("Không tìm thấy phòng.", 404);
+
+        var now = DateTime.Now;
+        var contract = await _db.Contracts.AsNoTracking()
+            .Where(c => c.RoomId == roomId && c.Status == ContractStatus.Active
+                        && c.StartDate <= now && (c.EndDate == null || c.EndDate.Value >= now))
+            .OrderByDescending(c => c.StartDate)
+            .FirstOrDefaultAsync();
+
+        var last = await _db.MeterReadings.AsNoTracking()
+            .Where(m => m.RoomId == roomId)
+            .OrderByDescending(m => m.ReadingDate).ThenByDescending(m => m.Id)
+            .FirstOrDefaultAsync();
+
+        return new MeterBillingInfoDto(
+            roomId, room.Name,
+            contract?.ElectricPrice ?? 0, contract?.WaterPrice ?? 0,
+            last?.ElectricIndex, last?.WaterIndex, last?.ReadingDate);
+    }
 
     public async Task<IReadOnlyList<MeterReadingDto>> ListByRoomAsync(int roomId)
     {

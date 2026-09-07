@@ -13,11 +13,13 @@ public class MeController : BaseController
 {
     private readonly MeService _me;
     private readonly RepairRequestService _repairs;
+    private readonly PaymentService _payments;
 
-    public MeController(MeService me, RepairRequestService repairs)
+    public MeController(MeService me, RepairRequestService repairs, PaymentService payments)
     {
         _me = me;
         _repairs = repairs;
+        _payments = payments;
     }
 
     [HttpGet("contracts")]
@@ -35,6 +37,11 @@ public class MeController : BaseController
     [HttpGet("payments")]
     public async Task<ActionResult<IReadOnlyList<PaymentDto>>> MyPayments()
         => Ok(await _me.GetMyPaymentsAsync(CurrentUserId));
+
+    /// <summary>Người thuê thanh toán trực tuyến hóa đơn của mình (trả đủ số còn thiếu).</summary>
+    [HttpPost("invoices/{id:int}/pay")]
+    public async Task<ActionResult<PaymentDto>> PayInvoice(int id, [FromBody] CreateMyPaymentRequest request)
+        => Ok(await _payments.CreateByTenantAsync(CurrentUserId, id, request));
 
     // ---- Yêu cầu sửa chữa của người thuê ----
 

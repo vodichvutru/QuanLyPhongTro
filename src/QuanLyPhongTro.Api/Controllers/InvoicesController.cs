@@ -27,6 +27,11 @@ public class InvoicesController : BaseController
     public async Task<ActionResult<InvoiceDto>> Create([FromBody] CreateInvoiceRequest request)
         => Ok(await _invoices.CreateAsync(request));
 
+    /// <summary>Dự toán hóa đơn theo kỳ (không lưu) — xem trước trước khi lập hóa đơn.</summary>
+    [HttpPost("preview")]
+    public async Task<ActionResult<InvoicePreviewDto>> Preview([FromBody] CreateInvoiceRequest request)
+        => Ok(await _invoices.PreviewAsync(request));
+
     [HttpPost("{id:int}/cancel")]
     public async Task<ActionResult<InvoiceDto>> Cancel(int id) => Ok(await _invoices.CancelAsync(id));
 

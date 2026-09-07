@@ -18,6 +18,11 @@ public class MeterReadingsController : BaseController
     public async Task<ActionResult<IReadOnlyList<MeterReadingDto>>> ListByRoom(int roomId)
         => Ok(await _readings.ListByRoomAsync(roomId));
 
+    /// <summary>Giá điện/nước theo hợp đồng + chỉ số gần nhất — dùng để ước tính tiền khi ghi chỉ số.</summary>
+    [HttpGet("room/{roomId:int}/billing-info")]
+    public async Task<ActionResult<MeterBillingInfoDto>> BillingInfo(int roomId)
+        => Ok(await _readings.GetBillingInfoAsync(roomId));
+
     [HttpPost]
     public async Task<ActionResult<MeterReadingDto>> Create([FromBody] CreateMeterReadingRequest request)
         => Ok(await _readings.CreateAsync(request));

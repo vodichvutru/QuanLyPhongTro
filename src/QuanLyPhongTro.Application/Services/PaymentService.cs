@@ -30,17 +30,53 @@ public class PaymentService
         if (request.Amount > remaining + 0.01m)
             throw new AppException($"Số tiền vượt quá số còn phải trả ({remaining:N0} VNĐ).");
 
+        return await AddPaymentAsync(invoice, request.Amount, request.Method,
+            request.PaidAt ?? DateTime.Now, request.Reference, request.Note);
+    }
+
+    /// <summary>
+    /// Người thuê thanh toán trực tuyến (BR-07): chỉ hóa đơn của chính mình, trả đủ số còn thiếu,
+    /// phương thức trực tuyến (không có tiền mặt). Ghi nhận ngay để chủ trọ đối chiếu.
+    /// </summary>
+    public async Task<PaymentDto> CreateByTenantAsync(int userId, int invoiceId, CreateMyPaymentRequest request)
+    {
+        var tenant = await _db.Tenants.AsNoTracking()
+            .FirstOrDefaultAsync(t => t.UserId == userId && t.IsActive)
+            ?? throw new AppException("Tài khoản của bạn chưa được liên kết với hồ sơ người thuê. Liên hệ chủ trọ.", 403);
+
+        var invoice = await _db.Invoices
+            .Include(i => i.Contract)
+            .FirstOrDefaultAsync(i => i.Id == invoiceId && i.Contract.TenantId == tenant.Id)
+            ?? throw new AppException("Không tìm thấy hóa đơn.", 404);
+        if (invoice.Status == InvoiceStatus.Cancelled)
+            throw new AppException("Không thể thanh toán cho hóa đơn đã hủy.", 409);
+        if (invoice.Status == InvoiceStatus.Paid)
+            throw new AppException("Hóa đơn này đã được thanh toán đủ.");
+
+        if (request.Method is not (PaymentMethod.BankTransfer or PaymentMethod.Momo or PaymentMethod.VnPay))
+            throw new AppException("Thanh toán qua web chỉ hỗ trợ Chuyển khoản, Ví Momo hoặc Cổng VNPay.");
+
+        var remaining = InvoiceCalculatorRound(invoice.TotalAmount - invoice.PaidAmount);
+        var reference = string.IsNullOrWhiteSpace(request.Reference)
+            ? $"WEB-{request.Method}-{DateTime.Now:yyyyMMddHHmmss}{Random.Shared.Next(100, 999)}"
+            : request.Reference.Trim();
+
+        return await AddPaymentAsync(invoice, remaining, request.Method, DateTime.Now, reference, request.Note);
+    }
+
+    private async Task<PaymentDto> AddPaymentAsync(Invoice invoice, decimal amount, PaymentMethod method, DateTime paidAt, string? reference, string? note)
+    {
         var payment = new Payment
         {
-            InvoiceId = request.InvoiceId,
-            Amount = request.Amount,
-            Method = request.Method,
-            PaidAt = request.PaidAt ?? DateTime.Now,
-            Reference = request.Reference?.Trim(),
-            Note = request.Note?.Trim()
+            InvoiceId = invoice.Id,
+            Amount = amount,
+            Method = method,
+            PaidAt = paidAt,
+            Reference = reference?.Trim(),
+            Note = note?.Trim()
         };
 
-        invoice.PaidAmount = InvoiceCalculatorRound(invoice.PaidAmount + request.Amount);
+        invoice.PaidAmount = InvoiceCalculatorRound(invoice.PaidAmount + amount);
         invoice.Status = invoice.PaidAmount >= invoice.TotalAmount - 0.01m
             ? InvoiceStatus.Paid
             : InvoiceStatus.PartiallyPaid;

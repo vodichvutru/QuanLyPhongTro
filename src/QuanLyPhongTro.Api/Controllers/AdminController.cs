@@ -30,6 +30,13 @@ public class AdminController : BaseController
     public async Task<ActionResult<UserDto>> SetUserActive(int id, [FromBody] SetUserActiveRequest request)
         => Ok(await _admin.SetUserActiveAsync(id, request));
 
+    [HttpPut("users/{id:int}/password")]
+    public async Task<IActionResult> ResetPassword(int id, [FromBody] ResetPasswordRequest request)
+    {
+        await _admin.ResetPasswordAsync(id, request);
+        return NoContent();
+    }
+
     [HttpGet("roles")]
     public async Task<ActionResult<IReadOnlyList<RoleDto>>> ListRoles() => Ok(await _admin.ListRolesAsync());
 }

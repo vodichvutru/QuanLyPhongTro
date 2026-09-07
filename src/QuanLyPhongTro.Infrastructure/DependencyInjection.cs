@@ -26,9 +26,14 @@ public static class DependencyInjection
     {
         using var scope = serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+
         await db.Database.EnsureCreatedAsync();
         await EnsureSchemaUpToDateAsync(db);
-        await DbSeeder.SeedAsync(db);
+
+        // Seed__Reset=true: xóa sạch và nạp lại bộ dữ liệu demo (chỉ lần chạy đó).
+        var reset = string.Equals(configuration["Seed:Reset"], "true", StringComparison.OrdinalIgnoreCase);
+        await DbSeeder.SeedAsync(db, reset);
     }
 
     /// <summary>
