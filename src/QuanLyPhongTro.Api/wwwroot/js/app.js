@@ -37,6 +37,13 @@ async function logout() { store.clear(); location.hash = '#/login'; }
 
 function pageKey() { return (location.hash || '#/home').replace(/^#\//, '').split('?')[0] || 'home'; }
 
+function animateView() {
+  const view = document.getElementById('view');
+  view.classList.remove('fx');
+  void view.offsetWidth; // force reflow de animation chay lai moi lan
+  view.classList.add('fx');
+}
+
 async function route() {
   const view = document.getElementById('view');
   const top = document.getElementById('topbar');
@@ -44,6 +51,7 @@ async function route() {
     top.classList.add('hidden');
     view.innerHTML = renderLogin();
     bindLogin();
+    animateView();
     return;
   }
   top.classList.remove('hidden');
@@ -53,6 +61,7 @@ async function route() {
   if (!page || !hasAny(page.roles)) { location.hash = '#/home'; return; }
   view.innerHTML = '<div class="center muted">Đang tải…</div>';
   try { await page.view(view); } catch (e) { view.innerHTML = '<div class="card"><b>Lỗi:</b> ' + esc(e.message) + '</div>'; }
+  animateView();
 }
 
 function renderNav() {
