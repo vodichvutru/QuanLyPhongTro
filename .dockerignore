@@ -1,0 +1,13 @@
+**/bin
+**/obj
+**/.git
+**/.vs
+**/.idea
+**/*.user
+tests
+Sprints
+demo-screens
+docs
+*.md
+*.slnx
+QuanLyPhongTro.Api.http

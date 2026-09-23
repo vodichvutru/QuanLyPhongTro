@@ -13,8 +13,10 @@ using QuanLyPhongTro.Infrastructure;
 var builder = WebApplication.CreateBuilder(args);
 
 // ---- Cấu hình từ appsettings ----
+// Không dùng secret mặc định: bắt buộc phải cấu hình Jwt:Secret (>= 32 ký tự) qua appsettings/secret manager/env.
+// Nếu thiếu sẽ fail nhanh khi khởi động thay vì âm thầm dùng secret công khai.
 var jwt = builder.Configuration.GetSection(JwtOptions.Section).Get<JwtOptions>()
-          ?? new JwtOptions { Secret = "QuanLyPhongTro_Secret_Key_0123456789" };
+          ?? new JwtOptions();
 if (string.IsNullOrEmpty(jwt.Secret) || jwt.Secret.Length < 32)
     throw new InvalidOperationException("Jwt:Secret phải có ít nhất 32 ký tự.");
 
