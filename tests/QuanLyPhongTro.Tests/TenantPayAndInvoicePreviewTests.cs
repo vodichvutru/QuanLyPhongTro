@@ -9,8 +9,8 @@ using QuanLyPhongTro.Infrastructure.Data;
 namespace QuanLyPhongTro.Tests;
 
 /// <summary>
-/// Thanh toán trực tuyến của người thuê (ghi nhận ngay, trả đủ) + dự toán hóa đơn khi lập
-/// + thông tin giá điện/nước cho màn hình ghi chỉ số.
+/// Thanh toán trực tuyến của người thuê (ghi nhận ngay, trả đủ) + dự toán/thông tin lập hóa đơn
+/// (chỉ số điện/nước được nhập trực tiếp trên hóa đơn).
 /// </summary>
 public class TenantPayAndInvoicePreviewTests
 {
@@ -58,27 +58,64 @@ public class TenantPayAndInvoicePreviewTests
     }
 
     [Fact]
-    public async Task TenantPay_FullAmount_MarksInvoicePaid_AndRecordsOnePayment()
+    public async Task TenantPay_CreatesPendingPayment_InvoiceWaitsForOwnerConfirmation()
     {
         var seed = await SeedTwoTenantsWithInvoicesAsync();
-        var svc = new PaymentService(seed.Db);
+        var svc = new PaymentService(seed.Db, new NotificationService(seed.Db));
 
         var payment = await svc.CreateByTenantAsync(seed.UserA, seed.InvoiceAId,
             new CreateMyPaymentRequest(PaymentMethod.Momo, Reference: "WEB-TEST-1"));
 
         Assert.Equal(2_000_000m, payment.Amount);
         Assert.StartsWith("WEB-TEST-1", payment.Reference);
+        Assert.Equal(PaymentStatus.Pending, payment.Status);
+
+        // Chưa tính vào số đã thu — chờ chủ trọ xác nhận
+        var invoice = await seed.Db.Invoices.AsNoTracking().SingleAsync(i => i.Id == seed.InvoiceAId);
+        Assert.Equal(InvoiceStatus.Unpaid, invoice.Status);
+        Assert.Equal(0m, invoice.PaidAmount);
+        Assert.Equal(1, await seed.Db.Payments.CountAsync(p => p.InvoiceId == seed.InvoiceAId));
+
+        // Có thông báo cho chủ trọ
+        Assert.Equal(1, await seed.Db.Notifications.CountAsync(n => n.TargetRole == "Owner" && n.Type == "payment.pending"));
+    }
+
+    [Fact]
+    public async Task OwnerConfirmsTenantPayment_MarksInvoicePaid_AndNotifiesTenant()
+    {
+        var seed = await SeedTwoTenantsWithInvoicesAsync();
+        var svc = new PaymentService(seed.Db, new NotificationService(seed.Db));
+        var pending = await svc.CreateByTenantAsync(seed.UserA, seed.InvoiceAId, new CreateMyPaymentRequest(PaymentMethod.Momo));
+
+        var confirmed = await svc.ConfirmAsync(pending.Id);
+
+        Assert.Equal(PaymentStatus.Confirmed, confirmed.Status);
         var invoice = await seed.Db.Invoices.AsNoTracking().SingleAsync(i => i.Id == seed.InvoiceAId);
         Assert.Equal(InvoiceStatus.Paid, invoice.Status);
         Assert.Equal(2_000_000m, invoice.PaidAmount);
-        Assert.Equal(1, await seed.Db.Payments.CountAsync(p => p.InvoiceId == seed.InvoiceAId));
+        Assert.Equal(1, await seed.Db.Notifications.CountAsync(n => n.TargetRole == "Tenant" && n.Type == "payment.confirmed"));
+    }
+
+    [Fact]
+    public async Task OwnerRejectsTenantPayment_InvoiceStaysUnpaid()
+    {
+        var seed = await SeedTwoTenantsWithInvoicesAsync();
+        var svc = new PaymentService(seed.Db, new NotificationService(seed.Db));
+        var pending = await svc.CreateByTenantAsync(seed.UserA, seed.InvoiceAId, new CreateMyPaymentRequest(PaymentMethod.Momo));
+
+        var rejected = await svc.RejectAsync(pending.Id, "Chưa nhận được tiền");
+
+        Assert.Equal(PaymentStatus.Rejected, rejected.Status);
+        var invoice = await seed.Db.Invoices.AsNoTracking().SingleAsync(i => i.Id == seed.InvoiceAId);
+        Assert.Equal(InvoiceStatus.Unpaid, invoice.Status);
+        Assert.Equal(0m, invoice.PaidAmount);
     }
 
     [Fact]
     public async Task TenantPay_EmptyReference_IsGeneratedWithWebPrefix()
     {
         var seed = await SeedTwoTenantsWithInvoicesAsync();
-        var svc = new PaymentService(seed.Db);
+        var svc = new PaymentService(seed.Db, new NotificationService(seed.Db));
 
         var payment = await svc.CreateByTenantAsync(seed.UserA, seed.InvoiceAId, new CreateMyPaymentRequest(PaymentMethod.VnPay));
 
@@ -89,7 +126,7 @@ public class TenantPayAndInvoicePreviewTests
     public async Task TenantPay_OtherTenantsInvoice_Throws404()
     {
         var seed = await SeedTwoTenantsWithInvoicesAsync();
-        var svc = new PaymentService(seed.Db);
+        var svc = new PaymentService(seed.Db, new NotificationService(seed.Db));
 
         var ex = await Assert.ThrowsAsync<AppException>(
             () => svc.CreateByTenantAsync(seed.UserA, seed.InvoiceBId, new CreateMyPaymentRequest(PaymentMethod.Momo)));
@@ -101,7 +138,7 @@ public class TenantPayAndInvoicePreviewTests
     public async Task TenantPay_AlreadyPaidInvoice_Throws()
     {
         var seed = await SeedTwoTenantsWithInvoicesAsync();
-        var svc = new PaymentService(seed.Db);
+        var svc = new PaymentService(seed.Db, new NotificationService(seed.Db));
         await svc.CreateByTenantAsync(seed.UserA, seed.InvoiceAId, new CreateMyPaymentRequest(PaymentMethod.Momo));
 
         await Assert.ThrowsAsync<AppException>(
@@ -112,7 +149,7 @@ public class TenantPayAndInvoicePreviewTests
     public async Task TenantPay_CashMethod_IsRejected()
     {
         var seed = await SeedTwoTenantsWithInvoicesAsync();
-        var svc = new PaymentService(seed.Db);
+        var svc = new PaymentService(seed.Db, new NotificationService(seed.Db));
 
         var ex = await Assert.ThrowsAsync<AppException>(
             () => svc.CreateByTenantAsync(seed.UserA, seed.InvoiceAId, new CreateMyPaymentRequest(PaymentMethod.Cash)));
@@ -127,7 +164,7 @@ public class TenantPayAndInvoicePreviewTests
         db.Users.Add(new User { Username = "no-link", PasswordHash = "x", FullName = "X", IsActive = true });
         await db.SaveChangesAsync();
 
-        var svc = new PaymentService(db);
+        var svc = new PaymentService(db, new NotificationService(db));
         var ex = await Assert.ThrowsAsync<AppException>(
             () => svc.CreateByTenantAsync(db.Users.First().Id, 1, new CreateMyPaymentRequest(PaymentMethod.Momo)));
 
@@ -155,13 +192,9 @@ public class TenantPayAndInvoicePreviewTests
         db.Contracts.Add(contract);
         await db.SaveChangesAsync();
 
-        db.MeterReadings.AddRange(
-            new MeterReading { RoomId = room.Id, ReadingDate = new DateTime(2026, 1, 31), ElectricIndex = 100, WaterIndex = 10 },
-            new MeterReading { RoomId = room.Id, ReadingDate = new DateTime(2026, 2, 10), ElectricIndex = 150, WaterIndex = 13 });
-        await db.SaveChangesAsync();
-
         var svc = new InvoiceService(db);
-        var preview = await svc.PreviewAsync(new CreateInvoiceRequest(room.Id, "2026-02"));
+        // Chỉ số đầu kỳ 100/10 → cuối kỳ 150/13 = dùng 50 kWh và 3 m³
+        var preview = await svc.PreviewAsync(new CreateInvoiceRequest(room.Id, "2026-02", 100, 150, 10, 13));
 
         Assert.Equal("P101", preview.RoomName);
         Assert.Equal(3, preview.Items.Count);
@@ -171,7 +204,7 @@ public class TenantPayAndInvoicePreviewTests
     }
 
     [Fact]
-    public async Task InvoicePreview_NoClosingReading_TreatsUsageAsZero_NoCrash()
+    public async Task InvoicePreview_ZeroUsage_OnlyRentItem()
     {
         var db = TestDb.New();
         var room = new Room { Name = "P101", Price = 2_000_000, Area = 20 };
@@ -186,18 +219,17 @@ public class TenantPayAndInvoicePreviewTests
             StartDate = new DateTime(2026, 1, 1), EndDate = null,
             MonthlyRent = 2_000_000, ElectricPrice = 3500, WaterPrice = 25000, Status = ContractStatus.Active
         });
-        // Chỉ có chỉ số đầu kỳ (tháng 2 chưa ghi chỉ số đóng) → không được crash, tiêu thụ = 0.
-        db.MeterReadings.Add(new MeterReading { RoomId = room.Id, ReadingDate = new DateTime(2026, 1, 31), ElectricIndex = 100, WaterIndex = 10 });
         await db.SaveChangesAsync();
 
-        var preview = await new InvoiceService(db).PreviewAsync(new CreateInvoiceRequest(room.Id, "2026-02"));
+        // Chỉ số đầu = cuối kỳ → tiêu thụ 0 → hóa đơn chỉ có tiền phòng.
+        var preview = await new InvoiceService(db).PreviewAsync(new CreateInvoiceRequest(room.Id, "2026-02", 100, 100, 10, 10));
 
         Assert.Single(preview.Items);
         Assert.Equal(2_000_000m, preview.TotalAmount); // chỉ tiền phòng
     }
 
     [Fact]
-    public async Task MeterBillingInfo_ReturnsContractPricesAndLastReading()
+    public async Task BillingInfo_UsesContractPricesAndLastInvoiceIndexes()
     {
         var db = TestDb.New();
         var room = new Room { Name = "P101", Price = 2_000_000, Area = 20 };
@@ -206,19 +238,29 @@ public class TenantPayAndInvoicePreviewTests
         var tenant = new Tenant { FullName = "Thuê", IsActive = true };
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync();
-        db.Contracts.Add(new Contract
+        var contract = new Contract
         {
             ContractCode = "HD", RoomId = room.Id, TenantId = tenant.Id,
             StartDate = new DateTime(2026, 1, 1), EndDate = null,
             MonthlyRent = 2_000_000, ElectricPrice = 3500, WaterPrice = 25000, Status = ContractStatus.Active
-        });
-        db.MeterReadings.Add(new MeterReading { RoomId = room.Id, ReadingDate = new DateTime(2026, 8, 1), ElectricIndex = 500, WaterIndex = 40 });
+        };
+        db.Contracts.Add(contract);
         await db.SaveChangesAsync();
 
-        var info = await new MeterReadingService(db).GetBillingInfoAsync(room.Id);
+        // Hóa đơn kỳ 2026-08 chốt chỉ số 500/40 → làm chỉ số đầu kỳ cho hóa đơn kế tiếp.
+        db.Invoices.Add(new Invoice
+        {
+            InvoiceCode = "INV-1", ContractId = contract.Id, BillingMonth = "2026-08",
+            ElectricOldIndex = 400, ElectricNewIndex = 500, WaterOldIndex = 30, WaterNewIndex = 40,
+            TotalAmount = 0, Status = InvoiceStatus.Unpaid
+        });
+        await db.SaveChangesAsync();
+
+        var info = await new InvoiceService(db).GetBillingInfoAsync(room.Id);
 
         Assert.Equal(3500m, info.ElectricPrice);
         Assert.Equal(25000m, info.WaterPrice);
+        Assert.Equal(2_000_000m, info.MonthlyRent);
         Assert.Equal(500m, info.LastElectricIndex);
         Assert.Equal(40m, info.LastWaterIndex);
     }

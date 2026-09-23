@@ -17,5 +17,4 @@ public class Room
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     public ICollection<Contract> Contracts { get; set; } = new List<Contract>();
-    public ICollection<MeterReading> MeterReadings { get; set; } = new List<MeterReading>();
 }

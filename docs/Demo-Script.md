@@ -31,16 +31,17 @@ Tài liệu hỗ trợ buổi bảo vệ (tiêu chí **Demo & làm việc nhóm*
 
 1. **Phòng**: tạo phòng mới, đổi trạng thái (Trống → Đang thuê → Bảo trì).
 2. **Người thuê**: tạo hồ sơ + tạo tài khoản đăng nhập (role Tenant) gắn với hồ sơ.
-3. **Hợp đồng**: tạo hợp đồng (phòng + người thuê + giá thuê + đơn giá điện/nước + cọc). Nói: "unique contract_code; không cho hợp đồng hiệu lực chồng lấn."
-4. **Chỉ số điện nước**: ghi chỉ số → hệ thống ước tính tiền theo hợp đồng; từ chối nếu chỉ số mới < cũ.
-5. **Hóa đơn**: chọn phòng + kỳ → **Preview** trước khi lưu → lưu hóa đơn. Nói: "tính tiền phòng + điện + nước + phụ thu, chống tạo trùng kỳ (409)."
-6. **Thanh toán**: ghi nhận thanh toán → trạng thái hóa đơn chuyển Unpaid → Partial → Paid.
+3. **Hợp đồng** (nơi gán người thuê cho phòng): tạo hợp đồng (phòng trống + người thuê + giá thuê + đơn giá điện/nước + cọc) → phòng tự chuyển "Đang cho thuê". Nói: "việc gán người thuê–phòng đi qua hợp đồng; không cho hợp đồng hiệu lực chồng lấn và mỗi người thuê chỉ 1 hợp đồng hiệu lực."
+4. **Hóa đơn (gộp cả chỉ số điện nước)**: chọn phòng + kỳ → **nhập chỉ số điện/nước đầu–cuối kỳ** (chỉ số đầu kỳ tự gợi ý từ hóa đơn trước) → xem **dự toán** (tiền phòng + điện + nước + phụ thu) → lưu. Nói: "chỉ số nhập ngay trên hóa đơn, máy tự tính tiền điện/nước rồi cộng tiền phòng; chống tạo trùng kỳ (409)."
+5. **Thu tiền**: mở hóa đơn vừa lập → ghi nhận thanh toán → trạng thái chuyển Unpaid → Partial → Paid. (Nếu khoản do **người thuê báo**, chủ trọ phải bấm **Xác nhận** thì hóa đơn mới cập nhật — xem mục 🔔.)
 
 ## 4. Cổng người thuê (1.5 phút) — Nguyễn Ngọc Tuấn
 
 1. Người thuê xem hợp đồng + danh sách hóa đơn của mình.
-2. **Thanh toán online** hóa đơn (chọn hình thức chuyển khoản/MoMo/VNPay) → trạng thái cập nhật.
-3. Gửi yêu cầu sửa chữa → chủ trọ duyệt/chuyển trạng thái → người thuê theo dõi.
+2. **Thanh toán online** hóa đơn (chọn chuyển khoản/MoMo/VNPay) → hóa đơn hiện *"chờ xác nhận"* (chưa tính là đã thu).
+3. Gửi yêu cầu sửa chữa.
+4. 🔔 **Chuyển sang tài khoản chủ trọ**: chuông thông báo hiện số chưa đọc (2 thông báo: người thuê báo thanh toán + yêu cầu sửa chữa mới). Bấm chuông → mở đúng trang → **Hóa đơn**: bấm **Xác nhận** khoản người thuê báo → hóa đơn chuyển *Đã thanh toán*; **Yêu cầu sửa chữa**: xem và bấm **Xử lý**.
+5. Quay lại tài khoản người thuê → chuông có thông báo *"Thanh toán đã được xác nhận"*.
 
 ## 5. Admin & báo cáo (1 phút) — Nguyễn Tiến Dũng
 

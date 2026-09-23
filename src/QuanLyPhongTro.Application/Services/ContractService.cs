@@ -61,6 +61,13 @@ public class ContractService
         if (conflict)
             throw new AppException("Phòng này đang có hợp đồng hoạt động trong khoảng thời gian trên.", 409);
 
+        // Một người thuê chỉ thuê 1 phòng tại một thời điểm
+        var tenantBusy = await _db.Contracts.AnyAsync(c =>
+            c.TenantId == request.TenantId && c.Status == ContractStatus.Active &&
+            (request.EndDate == null || (c.StartDate <= request.EndDate.Value && (c.EndDate == null || c.EndDate.Value >= request.StartDate))));
+        if (tenantBusy)
+            throw new AppException("Người thuê này đang có hợp đồng thuê phòng khác trong khoảng thời gian trên.", 409);
+
         var code = $"HD-{request.StartDate:yyyyMMdd}-{await _db.Contracts.CountAsync() + 1:000}";
         var contract = new Contract
         {

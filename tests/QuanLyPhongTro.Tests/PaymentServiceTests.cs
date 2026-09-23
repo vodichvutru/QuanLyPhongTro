@@ -19,7 +19,7 @@ public class PaymentServiceTests
         await db.SaveChangesAsync();
         var id = (await db.Invoices.FirstAsync()).Id;
 
-        var svc = new PaymentService(db);
+        var svc = new PaymentService(db, new NotificationService(db));
         await svc.CreateAsync(new CreatePaymentRequest(id, 400_000, PaymentMethod.Cash));
 
         var upd = await db.Invoices.FindAsync(id);
@@ -34,7 +34,7 @@ public class PaymentServiceTests
         db.Invoices.Add(new Invoice { InvoiceCode = "H1", ContractId = 1, BillingMonth = "2026-08", TotalAmount = Total, Status = InvoiceStatus.Unpaid });
         await db.SaveChangesAsync();
         var id = (await db.Invoices.FirstAsync()).Id;
-        var svc = new PaymentService(db);
+        var svc = new PaymentService(db, new NotificationService(db));
 
         await svc.CreateAsync(new CreatePaymentRequest(id, 400_000, PaymentMethod.Cash));
         await svc.CreateAsync(new CreatePaymentRequest(id, 600_000, PaymentMethod.Cash));
@@ -52,7 +52,7 @@ public class PaymentServiceTests
         await db.SaveChangesAsync();
         var id = (await db.Invoices.FirstAsync()).Id;
 
-        var svc = new PaymentService(db);
+        var svc = new PaymentService(db, new NotificationService(db));
         var ex = await Assert.ThrowsAsync<AppException>(
             () => svc.CreateAsync(new CreatePaymentRequest(id, Total + 1, PaymentMethod.Cash)));
         Assert.Equal(400, ex.StatusCode);
@@ -66,7 +66,7 @@ public class PaymentServiceTests
         await db.SaveChangesAsync();
         var id = (await db.Invoices.FirstAsync()).Id;
 
-        var svc = new PaymentService(db);
+        var svc = new PaymentService(db, new NotificationService(db));
         var ex = await Assert.ThrowsAsync<AppException>(
             () => svc.CreateAsync(new CreatePaymentRequest(id, 100_000, PaymentMethod.Cash)));
         Assert.Equal(409, ex.StatusCode);

@@ -11,6 +11,12 @@ public class Payment
 
     public decimal Amount { get; set; }
     public PaymentMethod Method { get; set; } = PaymentMethod.Cash;
+
+    /// <summary>Trạng thái xác nhận. Thanh toán do người thuê báo = Pending (chờ chủ trọ xác nhận);
+    /// chủ trọ tự ghi nhận = Confirmed.</summary>
+    public PaymentStatus Status { get; set; } = PaymentStatus.Confirmed;
+    public DateTime? ConfirmedAt { get; set; }
+
     public DateTime PaidAt { get; set; } = DateTime.Now;
     public string? Reference { get; set; }
     public string? Note { get; set; }

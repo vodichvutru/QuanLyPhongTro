@@ -31,6 +31,17 @@ public enum PaymentMethod
     Other = 5
 }
 
+/// <summary>Trạng thái xác nhận của một khoản thanh toán.</summary>
+public enum PaymentStatus
+{
+    /// <summary>Người thuê báo đã trả — chờ chủ trọ kiểm tra, xác nhận.</summary>
+    Pending = 1,
+    /// <summary>Chủ trọ đã xác nhận (hoặc chủ trọ tự ghi nhận) — được tính vào số đã thu.</summary>
+    Confirmed = 2,
+    /// <summary>Chủ trọ từ chối (không khớp thực tế).</summary>
+    Rejected = 3
+}
+
 public enum RepairStatus
 {
     Pending = 1,

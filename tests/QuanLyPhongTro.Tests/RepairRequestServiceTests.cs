@@ -51,7 +51,7 @@ public class RepairRequestServiceTests
     public async Task TenantCreateRequest_ForNotOwnedRoom_Throws403()
     {
         var (db, uid, _, _, otherRoomId) = await SeedAsync();
-        var svc = new RepairRequestService(db);
+        var svc = new RepairRequestService(db, new NotificationService(db));
 
         var ex = await Assert.ThrowsAsync<AppException>(() =>
             svc.CreateMineAsync(uid, new CreateMyRepairRequestRequest(otherRoomId, "Hỏng điều hòa")));
@@ -62,7 +62,7 @@ public class RepairRequestServiceTests
     public async Task TenantCreateRequest_ForOwnedRoom_Succeeds()
     {
         var (db, uid, tenantId, roomId, _) = await SeedAsync();
-        var svc = new RepairRequestService(db);
+        var svc = new RepairRequestService(db, new NotificationService(db));
 
         var result = await svc.CreateMineAsync(uid, new CreateMyRepairRequestRequest(roomId, "Bóng đèn hỏng", "Nhấp nháy"));
 
@@ -75,7 +75,7 @@ public class RepairRequestServiceTests
     public async Task OwnerUpdateStatus_SetsStatusAndCost()
     {
         var (db, uid, _, roomId, _) = await SeedAsync();
-        var svc = new RepairRequestService(db);
+        var svc = new RepairRequestService(db, new NotificationService(db));
         var created = await svc.CreateMineAsync(uid, new CreateMyRepairRequestRequest(roomId, "Vỡ bồn cầu"));
 
         var updated = await svc.UpdateStatusAsync(created.Id, 2,
@@ -89,7 +89,7 @@ public class RepairRequestServiceTests
     public async Task OwnerUpdateStatus_AfterCompleted_Throws409()
     {
         var (db, uid, _, roomId, _) = await SeedAsync();
-        var svc = new RepairRequestService(db);
+        var svc = new RepairRequestService(db, new NotificationService(db));
         var created = await svc.CreateMineAsync(uid, new CreateMyRepairRequestRequest(roomId, "Hỏng cửa"));
         await svc.UpdateStatusAsync(created.Id, 2, new UpdateRepairStatusRequest(RepairStatus.Completed));
 
@@ -102,7 +102,7 @@ public class RepairRequestServiceTests
     public async Task TenantCancel_NonPending_Throws409()
     {
         var (db, uid, _, roomId, _) = await SeedAsync();
-        var svc = new RepairRequestService(db);
+        var svc = new RepairRequestService(db, new NotificationService(db));
         var created = await svc.CreateMineAsync(uid, new CreateMyRepairRequestRequest(roomId, "Hỏng đèn"));
         await svc.UpdateStatusAsync(created.Id, 2, new UpdateRepairStatusRequest(RepairStatus.Approved));
 

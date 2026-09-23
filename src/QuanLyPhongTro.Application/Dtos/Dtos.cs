@@ -51,6 +51,7 @@ public record RoomDto(
     string? Note,
     RoomStatus Status,
     string StatusName,
+    string? TenantName,
     DateTime CreatedAt);
 
 public record CreateRoomRequest(
@@ -139,34 +140,16 @@ public record CreateContractRequest(
 
 public record TerminateContractRequest(DateTime? TerminatedAt = null, string? Reason = null);
 
-// ---------------- Meter readings ----------------
-
-public record MeterReadingDto(
-    int Id,
+/// <summary>Thông tin phục vụ lập hóa đơn: tiền phòng, giá điện/nước, chỉ số chốt kỳ trước của phòng.</summary>
+public record RoomBillingInfoDto(
     int RoomId,
     string RoomName,
-    DateTime ReadingDate,
-    decimal ElectricIndex,
-    decimal WaterIndex,
-    string? Note,
-    DateTime CreatedAt);
-
-public record CreateMeterReadingRequest(
-    int RoomId,
-    DateTime ReadingDate,
-    decimal ElectricIndex,
-    decimal WaterIndex,
-    string? Note = null);
-
-/// <summary>Giá điện/nước theo hợp đồng đang hiệu lực + chỉ số gần nhất — dùng để ước tính tiền khi ghi chỉ số.</summary>
-public record MeterBillingInfoDto(
-    int RoomId,
-    string RoomName,
+    string? TenantName,
+    decimal MonthlyRent,
     decimal ElectricPrice,
     decimal WaterPrice,
-    decimal? LastElectricIndex,
-    decimal? LastWaterIndex,
-    DateTime? LastReadingDate);
+    decimal LastElectricIndex,
+    decimal LastWaterIndex);
 
 // ---------------- Invoices ----------------
 
@@ -188,10 +171,16 @@ public record InvoiceDto(
     int TenantId,
     string TenantName,
     string BillingMonth,
+    decimal ElectricOldIndex,
+    decimal ElectricNewIndex,
+    decimal WaterOldIndex,
+    decimal WaterNewIndex,
     DateTime IssueDate,
     DateTime? DueDate,
     decimal TotalAmount,
     decimal PaidAmount,
+    /// <summary>Số tiền người thuê đã báo trả nhưng chờ chủ trọ xác nhận.</summary>
+    decimal PendingAmount,
     decimal PreviousDebt,
     InvoiceStatus Status,
     string StatusName,
@@ -210,6 +199,10 @@ public record InvoiceItemDto(
 public record CreateInvoiceRequest(
     int RoomId,
     string BillingMonth,
+    decimal ElectricOldIndex,
+    decimal ElectricNewIndex,
+    decimal WaterOldIndex,
+    decimal WaterNewIndex,
     DateTime? DueDate = null,
     string? Note = null,
     List<ExtraFeeLine>? ExtraItems = null);
@@ -231,9 +224,26 @@ public record PaymentDto(
     decimal Amount,
     PaymentMethod Method,
     string MethodName,
+    PaymentStatus Status,
+    string StatusName,
     DateTime PaidAt,
+    DateTime? ConfirmedAt,
     string? Reference,
     string? Note,
+    DateTime CreatedAt);
+
+/// <summary>Lý do từ chối một khoản thanh toán (không bắt buộc).</summary>
+public record RejectPaymentRequest(string? Reason = null);
+
+/// <summary>Thông báo cho một vai trò (chủ trọ / người thuê).</summary>
+public record NotificationDto(
+    int Id,
+    string Type,
+    string Title,
+    string Message,
+    string? LinkPath,
+    string TargetRole,
+    bool IsRead,
     DateTime CreatedAt);
 
 public record CreatePaymentRequest(

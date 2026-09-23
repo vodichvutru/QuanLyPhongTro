@@ -22,7 +22,12 @@ public class InvoicesController : BaseController
     [HttpGet("{id:int}")]
     public async Task<ActionResult<InvoiceDto>> Get(int id) => Ok(await _invoices.GetAsync(id));
 
-    /// <summary>Tạo hóa đơn tự động: truyền roomId + kỳ yyyy-MM.</summary>
+    /// <summary>Tiền phòng, giá điện/nước và chỉ số chốt kỳ trước của phòng — để lập hóa đơn.</summary>
+    [HttpGet("billing-info/{roomId:int}")]
+    public async Task<ActionResult<RoomBillingInfoDto>> BillingInfo(int roomId)
+        => Ok(await _invoices.GetBillingInfoAsync(roomId));
+
+    /// <summary>Tạo hóa đơn: truyền roomId, kỳ yyyy-MM và chỉ số điện/nước đầu/cuối kỳ.</summary>
     [HttpPost]
     public async Task<ActionResult<InvoiceDto>> Create([FromBody] CreateInvoiceRequest request)
         => Ok(await _invoices.CreateAsync(request));

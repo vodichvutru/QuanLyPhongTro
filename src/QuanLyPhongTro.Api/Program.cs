@@ -30,7 +30,7 @@ builder.Services.AddScoped<AdminService>();
 builder.Services.AddScoped<RoomService>();
 builder.Services.AddScoped<TenantService>();
 builder.Services.AddScoped<ContractService>();
-builder.Services.AddScoped<MeterReadingService>();
+builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<InvoiceService>();
 builder.Services.AddScoped<PaymentService>();
 builder.Services.AddScoped<MeService>();

@@ -10,8 +10,13 @@ namespace QuanLyPhongTro.Application.Services;
 public class RepairRequestService
 {
     private readonly AppDbContext _db;
+    private readonly NotificationService _notifications;
 
-    public RepairRequestService(AppDbContext db) => _db = db;
+    public RepairRequestService(AppDbContext db, NotificationService notifications)
+    {
+        _db = db;
+        _notifications = notifications;
+    }
 
     // ---------- Chủ trọ / Admin ----------
 
@@ -146,6 +151,16 @@ public class RepairRequestService
             CreatedByName = tenantName
         };
         _db.RepairRequests.Add(repair);
+
+        var roomName = await _db.Rooms.AsNoTracking().Where(r => r.Id == request.RoomId).Select(r => r.Name).SingleAsync();
+        _notifications.Add(
+            targetRole: "Owner",
+            type: "repair.created",
+            title: "Yêu cầu sửa chữa mới",
+            message: $"{tenantName} (phòng {roomName}) gửi yêu cầu: \"{repair.Subject}\".",
+            linkPath: "/repairs",
+            actorUserId: userId);
+
         await _db.SaveChangesAsync();
         return await GetAsync(repair.Id);
     }

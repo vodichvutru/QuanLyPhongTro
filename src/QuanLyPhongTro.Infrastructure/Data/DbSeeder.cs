@@ -145,38 +145,10 @@ public static class DbSeeder
         }
         await db.SaveChangesAsync();
 
-        // ---------- 5. Meter readings (cuối tháng, từ trước cửa sổ đến hết tháng trước) ----------
-        // Điện/nước tích lũy tăng dần, để "tạo hóa đơn" sau này vẫn tính được tiêu thụ.
-        for (var i = 0; i < rented.Count; i++)
-        {
-            var room = rented[i];
-            var baseElec = 320 + i * 97m;
-            var baseWater = 18 + i * 9m;
-            var dE = 96 + (i * 23) % 70;   // kWh/tháng
-            var dW = 6 + (i * 4) % 6;      // m³/tháng
-            for (var off = -1; off <= 4; off++) // tháng từ winStart-1 đến winStart+4 (tức tháng trước)
-            {
-                var boundary = winStart.AddMonths(off);
-                var lastDay = new DateTime(boundary.Year, boundary.Month, DateTime.DaysInMonth(boundary.Year, boundary.Month));
-                if (lastDay >= today) continue;
-                baseElec += dE;
-                baseWater += dW;
-                db.MeterReadings.Add(new MeterReading
-                {
-                    RoomId = room.Id,
-                    ReadingDate = lastDay,
-                    ElectricIndex = decimal.Round(baseElec, 2),
-                    WaterIndex = decimal.Round(baseWater, 2),
-                    Note = $"Chốt cuối tháng {lastDay:MM/yyyy}"
-                });
-            }
-        }
-        await db.SaveChangesAsync();
-
-        // ---------- 6. Invoices + Payments ----------
+        // ---------- 5. Invoices + Payments (chỉ số điện/nước lưu thẳng trên hóa đơn) ----------
         await SeedInvoicesAndPaymentsAsync(db, contracts, rented, tenants, today, winStart);
 
-        // ---------- 7. Repair requests ----------
+        // ---------- 6. Repair requests ----------
         await SeedRepairsAsync(db, roomEntities, tenants, tenantUsers);
 
         db.Database.ExecuteSqlRaw("SET FOREIGN_KEY_CHECKS=1");
@@ -199,6 +171,8 @@ public static class DbSeeder
             var month = new DateTime(contract.StartDate.Year, contract.StartDate.Month, 1);
             var endMonth = new DateTime(today.Year, today.Month, 1);
             decimal carried = 0;
+            var elecIndex = 320 + i * 97m;   // chỉ số điện lũy kế
+            var waterIndex = 18 + i * 9m;    // chỉ số nước lũy kế
 
             while (month <= endMonth)
             {
@@ -206,13 +180,20 @@ public static class DbSeeder
                 var monthEnd = new DateTime(month.Year, month.Month, DateTime.DaysInMonth(month.Year, month.Month));
                 var isCurrent = month.Year == today.Year && month.Month == today.Month;
 
+                // Chỉ số đầu/cuối kỳ (tháng hiện tại chưa chốt điện/nước → tiêu thụ 0)
+                var oldElec = elecIndex;
+                var oldWater = waterIndex;
+                var usedE = isCurrent ? 0 : dE;
+                var usedW = isCurrent ? 0 : dW;
+                var newElec = oldElec + usedE;
+                var newWater = oldWater + usedW;
+
                 // Dòng chi tiết
                 var items = new List<InvoiceItem> { new() { Name = $"Tiền phòng {room.Name}", Quantity = 1, UnitPrice = contract.MonthlyRent, Amount = contract.MonthlyRent } };
-                if (!isCurrent) // tháng hiện tại chưa chốt điện/nước
-                {
-                    items.Add(new InvoiceItem { Name = "Tiền điện", Quantity = dE, Unit = "kWh", UnitPrice = contract.ElectricPrice, Amount = dE * contract.ElectricPrice });
-                    items.Add(new InvoiceItem { Name = "Tiền nước", Quantity = dW, Unit = "m³", UnitPrice = contract.WaterPrice, Amount = dW * contract.WaterPrice });
-                }
+                if (usedE > 0)
+                    items.Add(new InvoiceItem { Name = "Tiền điện", Quantity = usedE, Unit = "kWh", UnitPrice = contract.ElectricPrice, Amount = usedE * contract.ElectricPrice });
+                if (usedW > 0)
+                    items.Add(new InvoiceItem { Name = "Tiền nước", Quantity = usedW, Unit = "m³", UnitPrice = contract.WaterPrice, Amount = usedW * contract.WaterPrice });
                 if (hasInternet)
                     items.Add(new InvoiceItem { Name = "Internet", Quantity = 1, UnitPrice = 150_000, Amount = 150_000 });
 
@@ -231,6 +212,10 @@ public static class DbSeeder
                     InvoiceCode = $"HD-{label.Replace("-", "")}-{room.Name}",
                     ContractId = contract.Id,
                     BillingMonth = label,
+                    ElectricOldIndex = oldElec,
+                    ElectricNewIndex = newElec,
+                    WaterOldIndex = oldWater,
+                    WaterNewIndex = newWater,
                     IssueDate = month,
                     DueDate = monthEnd,
                     TotalAmount = total,
@@ -245,6 +230,8 @@ public static class DbSeeder
                     pendingPayments.Add((invoice, paid, (PaymentMethod)((i + month.Month) % 3 + 1), PickPaymentDate(i, month, today, winStart), $"Thanh toán tiền {label}"));
 
                 carried += Math.Max(0, total - paid); // công nợ chuyển kỳ sau
+                elecIndex = newElec;
+                waterIndex = newWater;
                 month = month.AddMonths(1);
             }
         }
@@ -375,7 +362,6 @@ public static class DbSeeder
         await db.Database.ExecuteSqlRawAsync("DELETE FROM `InvoiceItems`");
         await db.Database.ExecuteSqlRawAsync("DELETE FROM `Payments`");
         await db.Database.ExecuteSqlRawAsync("DELETE FROM `Invoices`");
-        await db.Database.ExecuteSqlRawAsync("DELETE FROM `MeterReadings`");
         await db.Database.ExecuteSqlRawAsync("DELETE FROM `Contracts`");
         await db.Database.ExecuteSqlRawAsync("DELETE FROM `Tenants`");
         await db.Database.ExecuteSqlRawAsync("DELETE FROM `UserRoles`");

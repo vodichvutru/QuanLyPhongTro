@@ -304,7 +304,7 @@ Use Case chi tiết được chọn: UC-06 Tạo hóa đơn tiền thuê. Các U
 | ----------- | --------------------------------------------------------------------------------------- | ------------------- | ----------------------- | ------------------------------- |
 | BR-01       | Email/username của tài khoản là duy nhất sau khi chuẩn hóa.                             | Chính sách hệ thống | UC-01; ENT-User         | Unique constraint + TC-001      |
 | BR-02       | Một phòng không được có hai hợp đồng đang hiệu lực chồng lấn cùng thời gian.            | ACT-02              | UC-04; ENT-Contract     | Validation + TC-004             |
-| BR-03       | Chỉ số mới phải lớn hơn hoặc bằng chỉ số cũ của cùng đồng hồ/kỳ.                        | ACT-02              | UC-05; ENT-MeterReading | Validation + TC-005             |
+| BR-03       | Chỉ số mới phải lớn hơn hoặc bằng chỉ số cũ của cùng đồng hồ/kỳ.                        | ACT-02              | UC-05; ENT-Invoice      | Validation + TC-005             |
 | BR-04       | Mỗi phòng chỉ có tối đa một hóa đơn cho một kỳ hóa đơn.                                 | ACT-02              | UC-06; ENT-Invoice      | Unique(room_id, billing_period) |
 | BR-05       | Tổng tiền hóa đơn = tiền phòng + tiền điện + tiền nước + phụ thu - giảm trừ (nếu có).   | ACT-02              | UC-06; ENT-Invoice      | Calculation test                |
 | BR-06       | Chỉ hóa đơn Chưa thanh toán/Thanh toán một phần mới được ghi nhận khoản thanh toán mới. | ACT-02              | UC-07; ENT-Payment      | State validation + TC-007       |
@@ -348,8 +348,8 @@ Chuyển mục tiêu người dùng thành lát cắt có thể ưu tiên, xây 
 | Statement        | Là chủ trọ, tôi muốn tạo hóa đơn từ hợp đồng và chỉ số điện nước, để tính đúng số tiền phải thu và giảm thao tác thủ công.                                                  |
 | Context / Notes  | Hóa đơn là đầu ra của chuỗi phòng → hợp đồng → điện nước → hóa đơn. Không cho phép tạo trùng cùng phòng và kỳ; dữ liệu nguồn phải được giữ nguyên khi tạo hóa đơn thất bại. |
 | Related Use Case | UC-06 · các bước 1–5; A1; E1; E2                                                                                                                                            |
-| Dependencies     | US-004, US-005; API-06; ENT-Contract, ENT-MeterReading, ENT-Invoice; JWT/RBAC                                                                                               |
-| Data involved    | ENT-Invoice, ENT-InvoiceItem, ENT-Contract, ENT-MeterReading, ENT-Room; amount là dữ liệu nghiệp vụ nhạy cảm                                                                |
+| Dependencies     | US-004, US-005; API-06; ENT-Contract, ENT-Invoice; JWT/RBAC                                                                                                                 |
+| Data involved    | ENT-Invoice (kèm chỉ số điện/nước), ENT-InvoiceItem, ENT-Contract, ENT-Room; amount là dữ liệu nghiệp vụ nhạy cảm                                                            |
 | NFR applicable   | NFR-PERF-01; NFR-SEC-01; NFR-REL-01; NFR-AUD-01                                                                                                                             |
 | Out of scope     | Thanh toán ngân hàng trực tuyến, gửi SMS/email tự động và tích hợp IoT trong release đầu.                                                                                   |
 
@@ -382,8 +382,8 @@ Mẫu phát biểu: "Hệ thống phải \[hành vi\] khi \[điều kiện\], đ
 | FR-002    | Hệ thống phải quản lý phòng với mã phòng duy nhất, giá thuê và trạng thái.                                    | UC-02           | Must         | Room DTO → RoomResponse         | TC-002           | Ready      |
 | FR-003    | Hệ thống phải tạo/cập nhật hồ sơ người thuê và liên kết tài khoản nếu có.                                     | UC-03           | Must         | Tenant DTO → TenantResponse     | TC-003           | Ready      |
 | FR-004    | Hệ thống phải quản lý hợp đồng với ngày bắt đầu, ngày kết thúc, giá thuê và trạng thái.                       | UC-04, BR-02    | Must         | Contract DTO → ContractResponse | TC-004           | Ready      |
-| FR-005    | Hệ thống phải từ chối chỉ số điện/nước nhỏ hơn chỉ số trước đó.                                               | UC-05, BR-03    | Must         | MeterReading → 400              | TC-005           | Ready      |
-| FR-006    | Hệ thống phải lưu chỉ số điện nước theo phòng và kỳ ghi nhận.                                                 | UC-05           | Must         | MeterReading → response         | TC-005           | Ready      |
+| FR-005    | Hệ thống phải từ chối chỉ số điện/nước nhỏ hơn chỉ số trước đó.                                               | UC-05, BR-03    | Must         | Invoice indexes → 400           | TC-005           | Ready      |
+| FR-006    | Hệ thống phải lưu chỉ số điện nước của kỳ trên hóa đơn (đầu kỳ/cuối kỳ).                                      | UC-05           | Must         | Invoice indexes → response      | TC-005           | Ready      |
 | FR-007    | Hệ thống phải tạo hóa đơn từ hợp đồng và chỉ số điện nước của kỳ.                                             | UC-06, US-006   | Must         | InvoiceRequest → Invoice        | TC-006           | Ready      |
 | FR-008    | Hệ thống không được tạo trùng hóa đơn cho cùng phòng và kỳ.                                                   | UC-06, BR-04    | Must         | roomId + period → 409           | TC-007           | Ready      |
 | FR-009    | Hệ thống phải tính tổng hóa đơn theo công thức nghiệp vụ đã cấu hình.                                         | UC-06, BR-05    | Must         | Invoice inputs → total          | TC-006           | Ready      |
@@ -463,8 +463,8 @@ erDiagram
     CONTRACT ||--o{ INVOICE : "1..N"
     INVOICE ||--o{ INVOICE_ITEM : "1..N"
     INVOICE ||--o{ PAYMENT : "1..N"
-    ROOM ||--o{ METER_READING : "1..N"
     ROOM ||--o{ REPAIR_REQUEST : "1..N"
+    NOTIFICATION }o--|| USER : "actor (optional)"
     TENANT ||--o{ REPAIR_REQUEST : "0..N"
 ```
 
@@ -476,7 +476,7 @@ _Hình 2. Mỗi bảng và cột phải có nguồn gốc từ khái niệm, qua
 | ---------------------- | ------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------- | -------------- |
 | Identity & RBAC        | Xác thực, user, role, JWT            | ENT-User, ENT-Role, ENT-UserRole (bảng nối)                 | Frontend/API → Identity; Identity → Authorization | Nhóm backend   |
 | Room Rental Management | Quản lý phòng, người thuê, hợp đồng   | ENT-Room, ENT-Tenant, ENT-Contract                          | Identity/AuthZ → Business                         | Nhóm nghiệp vụ |
-| Billing & Payment      | Điện nước, hóa đơn, thanh toán        | ENT-MeterReading, ENT-Invoice, ENT-InvoiceItem, ENT-Payment | Contract/Utility → Billing → Report               | Nhóm nghiệp vụ |
+| Billing & Payment      | Điện nước, hóa đơn, thanh toán        | ENT-Invoice (kèm chỉ số điện/nước), ENT-InvoiceItem, ENT-Payment | Contract → Billing → Report                       | Nhóm nghiệp vụ |
 | Maintenance            | Tiếp nhận và xử lý yêu cầu sửa chữa   | ENT-RepairRequest                                           | Tenant → Maintenance → Owner                      | Nhóm nghiệp vụ |
 
 ## 5.2 Domain object catalog
@@ -489,10 +489,10 @@ _Hình 2. Mỗi bảng và cột phải có nguồn gốc từ khái niệm, qua
 | ENT-Room          | Room          | Entity/Aggregate | Phòng trọ, giá thuê và trạng thái                       | Id; name unique                | Room Rental   |
 | ENT-Tenant        | Tenant        | Entity/Aggregate | Thông tin người thuê và liên kết tài khoản              | Id                             | Room Rental   |
 | ENT-Contract      | Contract      | Entity/Aggregate | Hợp đồng gắn phòng, người thuê, thời hạn và giá         | Id; contract_code unique       | Room Rental   |
-| ENT-MeterReading  | MeterReading  | Entity           | Chỉ số điện nước theo phòng và thời điểm                | Id                             | Billing       |
-| ENT-Invoice       | Invoice       | Entity/Aggregate | Khoản phải thu theo hợp đồng và kỳ                      | Id; invoice_code unique        | Billing       |
+| ENT-Invoice       | Invoice       | Entity/Aggregate | Khoản phải thu theo hợp đồng và kỳ (kèm chỉ số điện/nước đã chốt) | Id; invoice_code unique | Billing |
 | ENT-InvoiceItem   | InvoiceItem   | Entity           | Các dòng tiền phòng/điện/nước/phụ thu                   | Id                             | Billing       |
-| ENT-Payment       | Payment       | Entity           | Khoản tiền đã ghi nhận thanh toán                       | Id                             | Billing       |
+| ENT-Payment       | Payment       | Entity           | Khoản tiền đã ghi nhận thanh toán (Pending/Confirmed/Rejected) | Id                      | Billing       |
+| ENT-Notification  | Notification  | Event/Entity     | Thông báo theo vai trò/tài khoản (báo thanh toán, yêu cầu sửa chữa...) | Id                 | Cross-cutting |
 | ENT-RepairRequest | RepairRequest | Entity/Aggregate | Yêu cầu sửa chữa do người thuê gửi                      | Id                             | Maintenance   |
 | ENT-AuditLog      | AuditLog      | Event/Entity     | Lịch sử hành động quan trọng (kế hoạch — FR-015 Draft)   | Id + correlation_id            | Cross-cutting |
 
@@ -503,7 +503,6 @@ _Hình 2. Mỗi bảng và cột phải có nguồn gốc từ khái niệm, qua
 | ENT-Room           | Contract, Tenant association   | BR-02: không có hợp đồng hiệu lực chồng lấn; phòng có trạng thái nhất quán                                        | Tạo/cập nhật phòng và thay đổi trạng thái | Strong    |
 | ENT-Contract       | Tenant, Room reference         | Ngày kết thúc ≥ ngày bắt đầu; giá thuê > 0; không chồng lấn hợp đồng hiệu lực                                     | Tạo/cập nhật/kết thúc hợp đồng            | Strong    |
 | ENT-Invoice        | InvoiceItem, Payment reference | Mỗi room + billing_period chỉ một hóa đơn; tổng = tổng item; payment không vượt số phải thu nếu không cho phép dư | Tạo hóa đơn và cập nhật trạng thái        | Strong    |
-| ENT-MeterReading   | —                              | Chỉ số mới ≥ chỉ số cũ; mỗi phòng/kỳ có một bộ chỉ số                                                             | Ghi nhận chỉ số                           | Strong    |
 | ENT-RepairRequest  | —                              | Chỉ người thuê thuộc phòng mới tạo request; trạng thái chuyển theo workflow                                       | Tạo/cập nhật trạng thái request           | Strong    |
 
 ## 5.4 Conceptual ERD / Domain Model
@@ -519,7 +518,6 @@ Sơ đồ ERD khái niệm (các entity và quan hệ) được vẽ ở đầu 
 | Contract → Invoice        | 1–N             | Restrict          | Không xóa hợp đồng khi còn hóa đơn               |
 | Invoice → InvoiceItem     | 1–N             | Cascade           | Xóa hóa đơn kéo theo các dòng chi tiết           |
 | Invoice → Payment         | 1–N             | Restrict          | —                                                |
-| Room → MeterReading       | 1–N             | Cascade           | —                                                |
 | Room → RepairRequest      | 1–N             | Restrict          | —                                                |
 | Tenant → RepairRequest    | 0–N             | SetNull           | Request giữ lại khi tenant bị xóa                |
 
@@ -576,6 +574,10 @@ Sơ đồ ERD khái niệm (các entity và quan hệ) được vẽ ở đầu 
 | invoice_code       | VARCHAR(30)   | No        | —                 | UQ                                                   | Mã hóa đơn, VD "HD-202608-P101"    |
 | contract_id        | INT           | No        | —                 | FK contracts(id), ON DELETE Restrict                 | Hợp đồng được lập hóa đơn          |
 | billing_month      | VARCHAR(7)    | No        | —                 | Dạng "YYYY-MM"                                       | Kỳ thanh toán, VD "2026-08"        |
+| electric_old_index | DECIMAL(18,2) | No        | 0                 | ≥ 0                                                  | Chỉ số điện đầu kỳ (kWh)           |
+| electric_new_index | DECIMAL(18,2) | No        | 0                 | ≥ electric_old_index                                 | Chỉ số điện cuối kỳ (kWh)          |
+| water_old_index    | DECIMAL(18,2) | No        | 0                 | ≥ 0                                                  | Chỉ số nước đầu kỳ (m³)            |
+| water_new_index    | DECIMAL(18,2) | No        | 0                 | ≥ water_old_index                                    | Chỉ số nước cuối kỳ (m³)           |
 | issue_date         | DATETIME      | No        | CURRENT_TIMESTAMP | —                                                    | Ngày lập hóa đơn                   |
 | due_date           | DATETIME      | Yes       | —                 | —                                                    | Hạn thanh toán                     |
 | total_amount       | DECIMAL(18,2) | No        | —                 | = tổng các InvoiceItem.amount                        | Tổng phải thu                      |
@@ -627,7 +629,7 @@ Sơ đồ ERD khái niệm (các entity và quan hệ) được vẽ ở đầu 
 
 ### ENT-Room · Phòng trọ / rooms
 
-**Quan hệ / cardinality:** Room 1–N Contract (Restrict); Room 1–N MeterReading (Cascade); Room 1–N RepairRequest (Restrict).
+**Quan hệ / cardinality:** Room 1–N Contract (Restrict); Room 1–N RepairRequest (Restrict). Người thuê hiện tại của phòng được **suy ra** từ hợp đồng đang hiệu lực (không lưu trực tiếp trên Room).
 
 | **Column / Field** | **Type**      | **Null?** | **Default**       | **Constraint / Rule**                | **Meaning / Example**     |
 | ------------------ | ------------- | --------- | ----------------- | ------------------------------------ | ------------------------- |
@@ -657,20 +659,6 @@ Sơ đồ ERD khái niệm (các entity và quan hệ) được vẽ ở đầu 
 | is_active          | BOOLEAN       | No        | true              | —                             | Trạng thái                  |
 | user_id            | INT           | Yes       | —                 | FK users(id), SetNull         | Liên kết tài khoản (nếu có) |
 | created_at         | DATETIME      | No        | CURRENT_TIMESTAMP | —                             | Thời điểm tạo               |
-
-### ENT-MeterReading · Chỉ số điện nước / meter_readings
-
-**Quan hệ / cardinality:** Room 1–N MeterReading (Cascade); mỗi phòng có một bộ chỉ số theo ReadingDate.
-
-| **Column / Field** | **Type**      | **Null?** | **Default**       | **Constraint / Rule** | **Meaning / Example**     |
-| ------------------ | ------------- | --------- | ----------------- | --------------------- | ------------------------- |
-| id                 | INT           | No        | AUTO_INCREMENT    | PK                    | Mã chỉ số (surrogate)     |
-| room_id            | INT           | No        | —                 | FK rooms(id), Cascade | Phòng                     |
-| reading_date       | DATETIME      | No        | —                 | —                     | Thời điểm chốt chỉ số    |
-| electric_index     | DECIMAL(18,2) | No        | —                 | ≥ 0                   | Chỉ số điện (kWh)         |
-| water_index        | DECIMAL(18,2) | No        | —                 | ≥ 0                   | Chỉ số nước (m³)          |
-| note               | VARCHAR(300)  | Yes       | —                 | —                     | Ghi chú                   |
-| created_at         | DATETIME      | No        | CURRENT_TIMESTAMP | —                     | Thời điểm tạo             |
 
 ### ENT-InvoiceItem · Dòng hóa đơn / invoice_items
 
@@ -727,7 +715,7 @@ Sơ đồ ERD khái niệm (các entity và quan hệ) được vẽ ở đầu 
 | ------------------------ | ------------------------------- | -------------------------- | --------------------------------------------- | --------------------------------- |
 | UC-02/API-RoomList       | status, room_number             | ≤ 1.000 phòng; peak 20 rps | INDEX(status), UNIQUE(room_number)            | Tăng nhẹ write; kiểm tra EXPLAIN  |
 | UC-04/API-ContractByRoom | room_id, start_date, end_date   | ≤ 5.000 hợp đồng           | INDEX(room_id, start_date)                    | Hỗ trợ kiểm tra hợp đồng hiệu lực |
-| UC-05/API-MeterReading   | room_id, period                 | ≤ 12.000 readings/năm      | UNIQUE(room_id, period)                       | Ngăn ghi trùng kỳ                 |
+| UC-05/API-Invoice        | contract_id, billing_month      | ≤ 50.000 invoices          | UNIQUE(invoice_code); INDEX(contract_id, billing_month) | Tra cứu công nợ/kỳ        |
 | UC-06/API-InvoiceList    | contract_id, billing_month, status | ≤ 50.000 invoices       | UNIQUE(invoice_code); INDEX(contract_id, billing_month), INDEX(status) | Tối ưu tra cứu công nợ |
 | UC-07/API-Payment        | invoice_id, paid_at             | ≤ 100.000 payments         | INDEX(invoice_id, paid_at)                    | Tăng tốc lịch sử thanh toán       |
 
@@ -822,7 +810,7 @@ _Hình 3. Các góc nhìn bổ sung cho nhau; không dùng một sơ đồ để
 | API-01     | POST /api/auth/login           | Đăng nhập và cấp JWT            | Public            | username, password                            | 200 JWT; 401 invalid     | p95 500ms; non-idempotent                |
 | API-02     | GET /api/rooms                 | Danh sách phòng                 | Admin/Owner       | filter,status,page,size                       | 200; 400 validation; 403 | p95 500ms; idempotent                    |
 | API-03     | POST /api/rooms                | Tạo phòng                       | Admin/Owner       | room_number,rent_price,status                 | 201; 400; 403; 409       | p95 500ms; non-idempotent                |
-| API-04     | POST /api/meter-readings       | Ghi nhận chỉ số                 | Admin/Owner       | room_id,period,electric_old,new,water_old,new | 201; 400; 403; 409       | transaction; retry safe by unique key    |
+| API-04     | POST /api/invoices             | Lập hóa đơn (kèm chỉ số điện/nước) | Admin/Owner    | room_id,billing_period,electric_old,new,water_old,new | 201; 400; 403; 409 | transaction; duplicate protected  |
 | API-05     | GET /api/contracts/{id}        | Xem hợp đồng                    | Admin/Owner       | contractId                                    | 200; 403; 404            | idempotent                               |
 | API-06     | POST /api/invoices             | Tạo hóa đơn                     | Admin/Owner       | room_id,billing_period                        | 201; 400; 403; 409       | transaction; duplicate protected         |
 | API-07     | POST /api/payments             | Ghi nhận thanh toán             | Admin/Owner       | invoice_id,amount,paid_at                     | 201; 400; 403; 409       | transaction; Idempotency-Key recommended |
@@ -979,7 +967,7 @@ _Hình 4. Truy vết hai chiều giúp phát hiện yêu cầu "mồ côi" và t
 | **Goal** | **UC**      | **US / AC**                | **FR**         | **NFR**                   | **Data**                         | **Design/API**         | **Test**       | **Status** |
 | -------- | ----------- | -------------------------- | -------------- | ------------------------- | -------------------------------- | ---------------------- | -------------- | ---------- |
 | GOAL-01  | UC-02/03/04 | US-002/003/004 + AC-01..03 | FR-002..004    | NFR-PERF-01               | ENT-Room/Tenant/Contract         | CMP-02/API-02..05      | TC-002..004    | Ready      |
-| GOAL-02  | UC-05/06/07 | US-005/006/007 + AC-01..04 | FR-005..010    | NFR-PERF-01; NFR-REL-01   | ENT-MeterReading/Invoice/Payment | CMP-03/API-04/06/07    | TC-005..008    | Ready      |
+| GOAL-02  | UC-05/06/07 | US-005/006/007 + AC-01..04 | FR-005..010    | NFR-PERF-01; NFR-REL-01   | ENT-Invoice/Payment              | CMP-03/API-04/06/07    | TC-005..008    | Ready      |
 | GOAL-03  | UC-01/11    | US-001/010 + AC-03/05      | FR-001/013/014 | NFR-SEC-01/02; NFR-AUD-01 | ENT-User/Role/UserRole            | CMP-01/API-01/10       | TC-001/011/012 | Ready      |
 | GOAL-04  | UC-08/09/10 | US-008/009 + AC-01..03/06  | FR-011/012     | NFR-USE-01; NFR-SEC-01    | ENT-Tenant/Invoice/RepairRequest | CMP-02/03/05/API-08/09 | TC-009/010     | Ready      |
 

@@ -13,11 +13,11 @@ public class AppDbContext : DbContext
     public DbSet<Room> Rooms => Set<Room>();
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<Contract> Contracts => Set<Contract>();
-    public DbSet<MeterReading> MeterReadings => Set<MeterReading>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<RepairRequest> RepairRequests => Set<RepairRequest>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -80,13 +80,6 @@ public class AppDbContext : DbContext
             e.HasOne(c => c.Tenant).WithMany(t => t.Contracts).HasForeignKey(c => c.TenantId).OnDelete(DeleteBehavior.Restrict);
         });
 
-        // ---- MeterReading ----
-        modelBuilder.Entity<MeterReading>(e =>
-        {
-            e.Property(m => m.Note).HasMaxLength(300);
-            e.HasOne(m => m.Room).WithMany(r => r.MeterReadings).HasForeignKey(m => m.RoomId).OnDelete(DeleteBehavior.Cascade);
-        });
-
         // ---- Invoice ----
         modelBuilder.Entity<Invoice>(e =>
         {
@@ -124,6 +117,17 @@ public class AppDbContext : DbContext
             e.Property(p => p.Reference).HasMaxLength(100);
             e.Property(p => p.Note).HasMaxLength(300);
             e.HasOne(p => p.Invoice).WithMany(i => i.Payments).HasForeignKey(p => p.InvoiceId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ---- Notification ----
+        modelBuilder.Entity<Notification>(e =>
+        {
+            e.Property(n => n.Type).HasMaxLength(50);
+            e.Property(n => n.Title).HasMaxLength(200);
+            e.Property(n => n.Message).HasMaxLength(500);
+            e.Property(n => n.LinkPath).HasMaxLength(200);
+            e.Property(n => n.TargetRole).HasMaxLength(20);
+            e.HasIndex(n => new { n.TargetRole, n.IsRead });
         });
 
         // ---- Decimal precision (MySQL không có decimal mặc định tốt) ----

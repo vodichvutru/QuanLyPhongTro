@@ -2,7 +2,7 @@ using QuanLyPhongTro.Core.Enums;
 
 namespace QuanLyPhongTro.Core.Entities;
 
-/// <summary>Hóa đơn tiền thuê theo tháng của một hợp đồng/phòng.</summary>
+/// <summary>Hóa đơn tiền thuê theo tháng của một hợp đồng/phòng (kèm chỉ số điện/nước đã chốt).</summary>
 public class Invoice
 {
     public int Id { get; set; }
@@ -13,6 +13,13 @@ public class Invoice
 
     /// <summary>Kỳ thanh toán, VD: "2026-08".</summary>
     public string BillingMonth { get; set; } = string.Empty;
+
+    /// <summary>Chỉ số điện đầu kỳ / cuối kỳ chốt tại thời điểm lập hóa đơn (kWh).</summary>
+    public decimal ElectricOldIndex { get; set; }
+    public decimal ElectricNewIndex { get; set; }
+    /// <summary>Chỉ số nước đầu kỳ / cuối kỳ chốt tại thời điểm lập hóa đơn (m³).</summary>
+    public decimal WaterOldIndex { get; set; }
+    public decimal WaterNewIndex { get; set; }
 
     public DateTime IssueDate { get; set; } = DateTime.Now;
     public DateTime? DueDate { get; set; }

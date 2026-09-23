@@ -11,9 +11,9 @@ public static class DtoMapper
         u.Id, u.Username, u.FullName, u.Email, u.Phone, u.IsActive,
         u.UserRoles.Select(ur => ur.Role.Code).OrderBy(c => c).ToList());
 
-    public static RoomDto ToRoom(Room r) => new(
+    public static RoomDto ToRoom(Room r, string? tenantName) => new(
         r.Id, r.Name, r.Floor, r.Area, r.Price, r.MaxPeople, r.Note, r.Status,
-        DisplayName(r.Status), r.CreatedAt);
+        DisplayName(r.Status), tenantName, r.CreatedAt);
 
     public static TenantDto ToTenant(Tenant t) => new(
         t.Id, t.FullName, t.Phone, t.IdentityNumber, t.Email, t.Address, t.Note,
@@ -24,19 +24,23 @@ public static class DtoMapper
         c.StartDate, c.EndDate, c.MonthlyRent, c.Deposit, c.ElectricPrice, c.WaterPrice,
         c.Status, DisplayName(c.Status), c.Note, c.CreatedAt);
 
-    public static MeterReadingDto ToMeterReading(MeterReading m, string roomName) => new(
-        m.Id, m.RoomId, roomName, m.ReadingDate, m.ElectricIndex, m.WaterIndex, m.Note, m.CreatedAt);
-
     public static InvoiceItemDto ToItem(InvoiceItem i) => new(
         i.Id, i.Name, i.Quantity, i.Unit, i.UnitPrice, i.Amount);
 
     public static PaymentDto ToPayment(Payment p) => new(
-        p.Id, p.InvoiceId, p.Amount, p.Method, DisplayName(p.Method), p.PaidAt, p.Reference, p.Note, p.CreatedAt);
+        p.Id, p.InvoiceId, p.Amount, p.Method, DisplayName(p.Method),
+        p.Status, DisplayName(p.Status), p.PaidAt, p.ConfirmedAt, p.Reference, p.Note, p.CreatedAt);
+
+    public static NotificationDto ToNotification(Notification n) => new(
+        n.Id, n.Type, n.Title, n.Message, n.LinkPath, n.TargetRole, n.IsRead, n.CreatedAt);
 
     public static InvoiceDto ToInvoice(Invoice inv) => new(
         inv.Id, inv.InvoiceCode, inv.ContractId, inv.Contract.RoomId, inv.Contract.Room.Name,
-        inv.Contract.TenantId, inv.Contract.Tenant.FullName, inv.BillingMonth, inv.IssueDate,
-        inv.DueDate, inv.TotalAmount, inv.PaidAmount, inv.PreviousDebt, inv.Status,
+        inv.Contract.TenantId, inv.Contract.Tenant.FullName, inv.BillingMonth,
+        inv.ElectricOldIndex, inv.ElectricNewIndex, inv.WaterOldIndex, inv.WaterNewIndex,
+        inv.IssueDate, inv.DueDate, inv.TotalAmount, inv.PaidAmount,
+        inv.Payments.Where(p => p.Status == PaymentStatus.Pending).Sum(p => p.Amount),
+        inv.PreviousDebt, inv.Status,
         DisplayName(inv.Status), inv.Note,
         inv.Items.OrderBy(i => i.Id).Select(ToItem).ToList(),
         inv.Payments.OrderByDescending(p => p.PaidAt).Select(ToPayment).ToList());
@@ -79,6 +83,14 @@ public static class DtoMapper
         RepairStatus.Completed => "Đã hoàn thành",
         RepairStatus.Rejected => "Từ chối",
         RepairStatus.Cancelled => "Đã hủy",
+        _ => s.ToString()
+    };
+
+    public static string DisplayName(PaymentStatus s) => s switch
+    {
+        PaymentStatus.Pending => "Chờ xác nhận",
+        PaymentStatus.Confirmed => "Đã xác nhận",
+        PaymentStatus.Rejected => "Từ chối",
         _ => s.ToString()
     };
 

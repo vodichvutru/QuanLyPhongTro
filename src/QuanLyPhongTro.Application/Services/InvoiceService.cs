@@ -19,6 +19,7 @@ public class InvoiceService
         var q = _db.Invoices.AsNoTracking()
             .Include(i => i.Contract).ThenInclude(c => c.Room)
             .Include(i => i.Contract).ThenInclude(c => c.Tenant)
+            .Include(i => i.Payments)
             .AsQueryable();
         if (status.HasValue) q = q.Where(i => i.Status == status.Value);
         if (!string.IsNullOrWhiteSpace(month)) q = q.Where(i => i.BillingMonth == month.Trim());
@@ -35,8 +36,37 @@ public class InvoiceService
     }
 
     /// <summary>
-    /// Tự động tạo hóa đơn cho một phòng theo kỳ (yyyy-MM): tìm hợp đồng còn hiệu lực,
-    /// tính điện/nước từ chỉ số đồng hồ, cộng tiền phòng + các khoản khác.
+    /// Thông tin phục vụ lập hóa đơn của một phòng: tiền phòng, giá điện/nước theo hợp đồng hiệu lực,
+    /// và chỉ số điện/nước chốt kỳ gần nhất (lấy từ hóa đơn mới nhất — làm chỉ số đầu kỳ cho hóa đơn mới).
+    /// </summary>
+    public async Task<RoomBillingInfoDto> GetBillingInfoAsync(int roomId)
+    {
+        var room = await _db.Rooms.AsNoTracking().FirstOrDefaultAsync(r => r.Id == roomId)
+            ?? throw new AppException("Không tìm thấy phòng.", 404);
+
+        var now = DateTime.Now;
+        var contract = await _db.Contracts.AsNoTracking()
+            .Include(c => c.Tenant)
+            .Where(c => c.RoomId == roomId && c.Status == ContractStatus.Active
+                        && c.StartDate <= now && (c.EndDate == null || c.EndDate.Value >= now))
+            .OrderByDescending(c => c.StartDate)
+            .FirstOrDefaultAsync();
+
+        var lastInvoice = await _db.Invoices.AsNoTracking()
+            .Where(i => i.Contract.RoomId == roomId && i.Status != InvoiceStatus.Cancelled)
+            .OrderByDescending(i => i.BillingMonth).ThenByDescending(i => i.Id)
+            .FirstOrDefaultAsync();
+
+        return new RoomBillingInfoDto(
+            roomId, room.Name, contract?.Tenant?.FullName,
+            contract?.MonthlyRent ?? room.Price,
+            contract?.ElectricPrice ?? 0, contract?.WaterPrice ?? 0,
+            lastInvoice?.ElectricNewIndex ?? 0, lastInvoice?.WaterNewIndex ?? 0);
+    }
+
+    /// <summary>
+    /// Tạo hóa đơn cho một phòng theo kỳ (yyyy-MM): tìm hợp đồng còn hiệu lực, tính tiền điện/nước
+    /// từ chỉ số đầu/cuối kỳ do người dùng nhập, cộng tiền phòng + các khoản khác.
     /// </summary>
     public async Task<InvoiceDto> CreateAsync(CreateInvoiceRequest request)
     {
@@ -61,13 +91,10 @@ public class InvoiceService
         if (existing is not null) // hóa đơn đã hủy → xóa đi để tạo lại
             _db.Invoices.Remove(existing);
 
-        var (opening, closing) = await FindReadingPairAsync(request.RoomId, monthStart, monthEnd);
-        // Chưa có chỉ số "đóng kỳ" (còn đang ghi, hoặc chưa ghi) → coi tiêu thụ kỳ này = 0, không được tính ra số âm.
-        var electricOpening = opening?.ElectricIndex ?? 0;
-        var waterOpening = opening?.WaterIndex ?? 0;
+        // Tiêu thụ = chỉ số cuối kỳ − chỉ số đầu kỳ (người dùng nhập khi lập hóa đơn).
         var (kwh, m3) = InvoiceCalculator.ComputeUsage(
-            electricOpening, closing?.ElectricIndex ?? electricOpening,
-            waterOpening, closing?.WaterIndex ?? waterOpening);
+            request.ElectricOldIndex, request.ElectricNewIndex,
+            request.WaterOldIndex, request.WaterNewIndex);
 
         var items = InvoiceCalculator.BuildItems(
             room.Name, contract.MonthlyRent, kwh, contract.ElectricPrice, m3, contract.WaterPrice,
@@ -82,6 +109,10 @@ public class InvoiceService
             InvoiceCode = $"HD-{year:0000}{month:00}-{room.Name}",
             ContractId = contract.Id,
             BillingMonth = monthLabel,
+            ElectricOldIndex = request.ElectricOldIndex,
+            ElectricNewIndex = request.ElectricNewIndex,
+            WaterOldIndex = request.WaterOldIndex,
+            WaterNewIndex = request.WaterNewIndex,
             IssueDate = DateTime.Now,
             DueDate = request.DueDate ?? monthEnd,
             TotalAmount = total,
@@ -104,8 +135,8 @@ public class InvoiceService
     }
 
     /// <summary>
-    /// Dự toán hóa đơn theo kỳ (không lưu): xem trước các khoản khi "Lập hóa đơn".
-    /// Dùng cùng logic của CreateAsync (hợp đồng hiệu lực + cặp chỉ số điện/nước + nợ kỳ trước).
+    /// Dự toán hóa đơn theo kỳ (không lưu): xem trước các khoản khi lập hóa đơn.
+    /// Dùng cùng logic của CreateAsync (hợp đồng hiệu lực + chỉ số đầu/cuối kỳ + nợ kỳ trước).
     /// </summary>
     public async Task<InvoicePreviewDto> PreviewAsync(CreateInvoiceRequest request)
     {
@@ -125,13 +156,9 @@ public class InvoiceService
             .FirstOrDefaultAsync()
             ?? throw new AppException($"Không tìm thấy hợp đồng còn hiệu lực cho phòng {room.Name} trong kỳ {request.BillingMonth}.");
 
-        var (opening, closing) = await FindReadingPairAsync(request.RoomId, monthStart, monthEnd);
-        // Chưa có chỉ số "đóng kỳ" → coi tiêu thụ kỳ này = 0 (không tính ra số âm).
-        var electricOpening = opening?.ElectricIndex ?? 0;
-        var waterOpening = opening?.WaterIndex ?? 0;
         var (kwh, m3) = InvoiceCalculator.ComputeUsage(
-            electricOpening, closing?.ElectricIndex ?? electricOpening,
-            waterOpening, closing?.WaterIndex ?? waterOpening);
+            request.ElectricOldIndex, request.ElectricNewIndex,
+            request.WaterOldIndex, request.WaterNewIndex);
 
         var items = InvoiceCalculator.BuildItems(
             room.Name, contract.MonthlyRent, kwh, contract.ElectricPrice, m3, contract.WaterPrice,
@@ -191,24 +218,6 @@ public class InvoiceService
             throw new AppException("Kỳ hóa đơn phải có dạng yyyy-MM (VD: 2026-08).");
         }
         return (year, m);
-    }
-
-    /// <summary>
-    /// Chọn cặp chỉ số: mở đầu = bản ghi mới nhất tại hoặc trước đầu kỳ;
-    /// kết thúc = bản ghi sau đó trong kỳ. Chưa đủ dữ liệu thì trả null (tính 0).
-    /// </summary>
-    private async Task<(MeterReading? Opening, MeterReading? Closing)> FindReadingPairAsync(int roomId, DateTime monthStart, DateTime monthEnd)
-    {
-        var readings = await _db.MeterReadings.AsNoTracking()
-            .Where(m => m.RoomId == roomId)
-            .OrderBy(m => m.ReadingDate).ThenBy(m => m.Id)
-            .ToListAsync();
-
-        var opening = readings.LastOrDefault(m => m.ReadingDate <= monthStart);
-        var closing = opening is null
-            ? null
-            : readings.LastOrDefault(m => m.ReadingDate > opening!.ReadingDate && m.ReadingDate <= monthEnd);
-        return (opening, closing);
     }
 
     private async Task<decimal> SumUnpaidOlderAsync(int contractId, string monthLabel)

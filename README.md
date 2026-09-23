@@ -2,7 +2,7 @@
 
 Hệ thống quản lý phòng trọ và thanh toán tiền thuê — đồ án **Lập trình Web nâng cao** (Nhóm 16).
 
-Backend **ASP.NET Core 8 Web API** (modular monolith) + **MySQL 8**, phân quyền **JWT/RBAC**, kèm frontend SPA tĩnh (wwwroot). Toàn bộ vòng đời: **phòng → người thuê → hợp đồng → điện/nước → hóa đơn → thanh toán** và **yêu cầu sửa chữa**.
+Backend **ASP.NET Core 8 Web API** (modular monolith) + **MySQL 8**, phân quyền **JWT/RBAC**; giao diện **React 19 + TypeScript + Vite** (build ra `wwwroot`). Toàn bộ vòng đời: **phòng → người thuê → hợp đồng → điện/nước → hóa đơn → thanh toán** và **yêu cầu sửa chữa**.
 
 ---
 
@@ -25,10 +25,13 @@ Backend **ASP.NET Core 8 Web API** (modular monolith) + **MySQL 8**, phân quy�
 
 ```
 src/
-├── QuanLyPhongTro.Api/           # Controllers, JWT, middleware, wwwroot (SPA)
+├── QuanLyPhongTro.Api/           # Controllers, JWT, middleware, wwwroot (build từ frontend)
 ├── QuanLyPhongTro.Application/    # Services nghiệp vụ, DTOs, security interface
 ├── QuanLyPhongTro.Core/           # Entities, Enums (domain)
 └── QuanLyPhongTro.Infrastructure/ # EF Core (MySQL), DbContext, Seeder
+frontend/                          # React + TypeScript + Vite (mã nguồn giao diện)
+├── src/pages/                     # các màn hình (Rooms, Tenants, Invoices, Reports, ...)
+└── vite.config.ts                 # cấu hình build → src/QuanLyPhongTro.Api/wwwroot
 ```
 
 Các module nghiệp vụ: **Identity/RBAC**, **Room Rental**, **Billing & Payment**, **Maintenance**.
@@ -37,7 +40,7 @@ Các module nghiệp vụ: **Identity/RBAC**, **Room Rental**, **Billing & Payme
 
 - **.NET 8 / ASP.NET Core Web API** + **EF Core (Pomelo MySQL 8)**
 - **JWT Bearer** (HS256) + RBAC theo vai trò; **BCrypt** hash mật khẩu
-- **Swagger/OpenAPI**, frontend SPA tĩnh (HTML/CSS/JS)
+- **React 19 + TypeScript + Vite** (giao diện), **Swagger/OpenAPI**
 - **xUnit** (EF Core InMemory) — 38 test
 - **Docker + docker-compose**
 
@@ -45,6 +48,7 @@ Các module nghiệp vụ: **Identity/RBAC**, **Room Rental**, **Billing & Payme
 
 - .NET 8 SDK
 - MySQL 8 (nếu chạy local, không dùng Docker)
+- Node.js 20+ — chỉ cần khi phát triển giao diện (bản build đã có sẵn trong `wwwroot`)
 
 ## Chạy nhanh
 
@@ -74,6 +78,19 @@ App tự tạo DB + seed khi chạy. Muốn reset về bộ demo: đặt `Seed:R
 | Admin | `admin` |
 | Chủ trọ | `chutro` |
 | Người thuê | `nguyenvana`, `tranthibinh`, `levancuong`, … |
+
+## Giao diện (frontend React)
+
+Mã nguồn ở `frontend/` (React 19 + TypeScript + Vite), build ra `src/QuanLyPhongTro.Api/wwwroot/` để API phục vụ.
+
+```bash
+cd frontend
+npm install
+npm run dev      # dev server http://localhost:5173 (proxy /api sang API ở cổng 5255)
+npm run build    # build production → src/QuanLyPhongTro.Api/wwwroot
+```
+
+> Bản build đã được commit sẵn trong `wwwroot` nên chỉ cần `dotnet run` là chạy ngay, không cần Node. Chỉ chạy `npm run build` khi bạn sửa giao diện.
 
 ## API chính
 
